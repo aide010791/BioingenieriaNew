@@ -1,0 +1,247 @@
+body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    height: 100vh;
+    margin: 0;
+    background-image: url(fondo3.jpg);
+    background-size: cover;
+}
+
+header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 60%;
+    padding: 10px 5px;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgb(255, 255, 255, 0));
+    backdrop-filter: blur(30px);
+    -webkit-backdrop-filter: blur(30px);
+    
+}
+
+.logo-izquierdo img, .logo-derecho img {
+    width: 100px; /* Ajusta el ancho de los logos a 50px */
+    height: 100px; /* Ajusta la altura de los logos a 50px */
+    object-fit: contain; /* Asegura que los logos mantengan sus proporciones */
+    padding: 0;
+}
+
+
+.titulo h1 {
+    flex-grow: 1; /* Permite que el título ocupe el espacio restante */
+    text-align: center;
+    padding: 0;
+    font-family: 'Roboto Slab', serif;
+}
+
+#contenedor-superior {
+    width: calc(100% - 40px);
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgb(255, 255, 255, 0));
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    color: #040404; /* Corregido para que sea un valor de color válido */
+    text-align: center;
+    padding: 20px;
+    margin: 20px 0; /* Aumentado para dar espacio entre el header y el contenedor */
+    box-sizing: border-box;
+}
+
+.linea {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 10px;
+}
+
+.campo {
+    margin: 0 50px;
+    font-family: 'Roboto Slab', serif;
+}
+
+
+input[type="text"] {
+    width: 100%;
+    box-sizing: border-box;
+    font-family: 'Roboto Slab', serif;
+}
+
+select {
+    padding: 4px 8px;
+    font-family: 'Roboto Slab', serif;
+    font-size: 14px;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+    background: white;
+    cursor: pointer;
+}
+
+
+.btn-registro,
+.btn-guardar,
+.btn-modificar{
+    height: auto;
+    width: 20%;
+    border-radius: 24px;
+    margin-bottom: 30px;
+    margin-left: 10px;
+    margin-top: 20px;
+    font-family: 'Roboto Slab', serif;
+    font-size: 18px;
+    text-align: center;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgb(255, 255, 255, 0));
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-color: hsl(149, 76%, 10%);
+    color: rgb(253, 253, 253);
+    box-shadow: 0 0 40px 40px hsl(169, 97%, 12%) inset, 0 0 0 0 rgb(1, 42, 22);
+    transition: all 150ms ease-in-out;
+}
+
+
+button:hover {
+    box-shadow: 0 0 10px 0 rgb(3, 96, 46) inset, 0 0 10px 4px rgb(1, 72, 37);
+    color: white;
+}
+
+
+input[type="number"]{
+    width: 50px; /* Ajusta el ancho segÃºn tus necesidades */
+    font-family: 'Roboto Slab', serif;
+    margin-left: 15px;
+    
+}
+
+.contenedor-principal {
+    display: flex;
+    flex-direction: row; /* Cambia la dirección a fila */
+    justify-content: space-between; /* Alinea los elementos separados entre sí */
+    align-items: flex-start; /* Alinea los elementos al inicio de su eje transversal */
+    width: 100%;
+    margin-bottom: 15px;
+}
+  
+.contenedor-equipos {
+    width: calc(50% - 10px); /* Ajusta el ancho al 50% menos un margen */
+    height: auto; /* O una altura fija si es necesario */
+    margin-right: 20px; /* Añade un margen a la derecha si deseas separar los contenedores */
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgb(255, 255, 255, 0));
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    padding: 20px;
+    font-family: 'Roboto Slab', serif;
+    font-size: 14px;
+}
+  
+.contenedor-derecho {
+    display: flex;
+    flex-direction: column; /* Asegura que los contenedores hijos se apilen verticalmente */
+    width: calc(50% - 10px); /* Ajusta el ancho al 50% menos un margen */
+    height: auto;
+}
+  
+.contenedor-puntas, .contenedor-stm32f4{
+    width: 100%; /* Los contenedores hijos ocupan todo el ancho del contenedor padre */
+    /*margin-top: 20px; /* Añade un margen superior para separar los contenedores */
+    margin-bottom: 15px;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgb(255, 255, 255, 0));
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    padding: 20px;
+    font-family: 'Roboto Slab', serif;
+    font-size: 14px;
+    
+}
+
+.contenedor-inferior{
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgb(255, 255, 255, 0));
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    padding: 20px;
+    font-family: 'Roboto Slab', serif;
+    font-size: 14px;
+    margin-bottom: 15px;
+}
+
+.contenedor-herramientas{
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgb(255, 255, 255, 0));
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    padding: 20px;
+    font-family: 'Roboto Slab', serif;
+    font-size: 14px;
+}
+
+.contenedor-equipos div {
+    margin-bottom: 5px; /* Ajusta este valor según tus necesidades para aumentar la separación horizontal */
+    
+}
+
+.contenedor-equipos input[type="checkbox"] {
+    margin-bottom: 5px; /* Ajusta este valor según tus necesidades */
+    margin-right: 20px;
+    
+}
+
+.checkbox-campo {
+    display: flex;
+    align-items: center; /* Alinea verticalmente el checkbox y el campo numérico */
+    margin-bottom: 5px; /* Espacio entre cada par */
+    
+    
+}
+.checkbox-campo input[type="number"] {
+    width: 50px; /* O el ancho que prefieras */
+    display: none; /* Inicia oculto */    
+      
+}
+
+
+.nombre-equipo, .cantidad-equipo {
+    display: flex;
+    align-items: center;
+    margin-right: 10px; /* Ajusta el espacio entre el checkbox y el campo numérico */
+}
+
+.cantidad-equipo input {
+    display: none; /* Inicialmente oculto, será mostrado por el script JS cuando el checkbox esté marcado */
+    width: 60px;
+    margin-right: 400px;
+}
+
+.herramienta-item {
+    display: flex;
+    align-items: center;
+}
+
+.equipo {
+    display: flex; /* Esto alinea los elementos hijos (checkbox y campo numérico) en una fila */
+    justify-content: flex-start; /* Alinea los elementos al inicio del contenedor */
+    align-items: center; /* Centra los elementos verticalmente */
+    margin-bottom: 5px;
+}
+
+.nombre-equipo {
+    flex-grow: 1; /* Permite que el contenedor del nombre del equipo ocupe todo el espacio disponible */
+}
+
+.cantidad-equipo {
+    flex-shrink: 0; /* Evita que el campo numérico se encoja si hay poco espacio */
+}
+
+
+@media screen and (max-width: 600px) {
+    .linea {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .campo {
+        margin: 10px 0;
+    }
+
+    .contenedor-inferior {
+        width: calc(100% - 20px);
+        margin: 10px 0;
+    }
+}
+
