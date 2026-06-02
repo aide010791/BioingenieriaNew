@@ -1,0 +1,910 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel Admin — Lab Bioingeniería</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #f0f4f8;
+            min-height: 100vh;
+            color: #1e293b;
+        }
+
+        /* ── Login ── */
+        #login-screen {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: #f0f4f8;
+        }
+
+        .login-box {
+            background: white;
+            border-radius: 16px;
+            padding: 40px;
+            width: 340px;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+            text-align: center;
+        }
+
+        .login-box img { width: 56px; margin-bottom: 16px; }
+        .login-box h2 { font-size: 20px; font-weight: 700; margin-bottom: 6px; }
+        .login-box p  { font-size: 13px; color: #64748b; margin-bottom: 24px; }
+
+        .login-box input {
+            width: 100%;
+            padding: 13px 14px;
+            border: 1.5px solid #e2e8f0;
+            border-radius: 10px;
+            font-family: 'Inter', sans-serif;
+            font-size: 15px;
+            margin-bottom: 12px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .login-box input:focus { border-color: #3b82f6; }
+
+        /* ── Panel ── */
+        #panel { display: none; }
+
+        /* ── Header ── */
+        .header {
+            background: #1e293b;
+            padding: 0 28px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 64px;
+        }
+
+        .header-logos { display: flex; align-items: center; gap: 12px; }
+        .header-logos img { height: 38px; object-fit: contain; filter: brightness(0) invert(1); }
+        .header h1 { color: white; font-size: 16px; font-weight: 600; }
+
+        .header-right { display: flex; align-items: center; gap: 12px; }
+        .btn-logout {
+            background: rgba(255,255,255,0.1);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 7px 14px;
+            font-family: 'Inter', sans-serif;
+            font-size: 13px;
+            cursor: pointer;
+        }
+
+        /* ── Barra de controles ── */
+        .controles {
+            background: white;
+            border-bottom: 1px solid #e2e8f0;
+            padding: 14px 28px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .controles label { font-size: 13px; font-weight: 600; color: #475569; }
+
+        .controles input[type="date"] {
+            padding: 9px 12px;
+            border: 1.5px solid #e2e8f0;
+            border-radius: 8px;
+            font-family: 'Inter', sans-serif;
+            font-size: 14px;
+            color: #1e293b;
+            outline: none;
+        }
+
+        .controles input[type="date"]:focus { border-color: #3b82f6; }
+
+        .btn-ctrl {
+            padding: 9px 18px;
+            border-radius: 8px;
+            font-family: 'Inter', sans-serif;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            transition: opacity 0.15s;
+        }
+
+        .btn-ctrl:active { opacity: 0.8; }
+        .btn-primary { background: #1e293b; color: white; }
+        .btn-secondary { background: #f1f5f9; color: #334155; border: 1.5px solid #e2e8f0; }
+
+        .stats {
+            margin-left: auto;
+            display: flex;
+            gap: 16px;
+        }
+
+        .stat {
+            text-align: center;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 6px 16px;
+        }
+
+        .stat-num { font-size: 18px; font-weight: 700; }
+        .stat-label { font-size: 11px; color: #64748b; }
+        .stat-pendiente .stat-num  { color: #d97706; }
+        .stat-entregado .stat-num  { color: #16a34a; }
+        .stat-parcial .stat-num    { color: #ea580c; }
+
+        /* ── Tabla ── */
+        .tabla-wrap {
+            padding: 24px 28px;
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0 6px;
+            font-size: 14px;
+        }
+
+        thead th {
+            background: #f8fafc;
+            padding: 10px 14px;
+            text-align: left;
+            font-size: 11px;
+            font-weight: 700;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 2px solid #e2e8f0;
+        }
+
+        tbody tr {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+            transition: box-shadow 0.2s;
+            cursor: pointer;
+        }
+
+        tbody tr:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+
+        tbody td {
+            padding: 14px;
+            border-top: 1px solid #f1f5f9;
+            border-bottom: 1px solid #f1f5f9;
+            vertical-align: middle;
+        }
+
+        tbody td:first-child {
+            border-left: 4px solid transparent;
+            border-radius: 10px 0 0 10px;
+            padding-left: 16px;
+        }
+
+        tbody td:last-child {
+            border-right: 1px solid #f1f5f9;
+            border-radius: 0 10px 10px 0;
+        }
+
+        /* Colores por estado — fila completa */
+        tr.pendiente td { background: #fffbeb; }
+        tr.pendiente td:first-child { border-left: 5px solid #f59e0b; }
+
+        tr.entregado td { background: #f0fdf4; }
+        tr.entregado td:first-child { border-left: 5px solid #22c55e; }
+
+        tr.parcial td { background: #fff7ed; }
+        tr.parcial td:first-child { border-left: 5px solid #f97316; }
+
+        /* ── Badge de estado ── */
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 14px;
+            border-radius: 99px;
+            font-size: 13px;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+
+        .badge-pendiente { background: #fef3c7; color: #92400e; border: 1.5px solid #fcd34d; }
+        .badge-entregado { background: #dcfce7; color: #166534; border: 1.5px solid #86efac; }
+        .badge-parcial   { background: #ffedd5; color: #9a3412; border: 1.5px solid #fdba74; }
+
+        /* ── Selector de estado ── */
+        .estado-select {
+            padding: 7px 12px;
+            border-radius: 99px;
+            font-family: 'Inter', sans-serif;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            outline: none;
+            border: 1.5px solid;
+            appearance: none;
+            -webkit-appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2.5'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 10px center;
+            padding-right: 28px;
+        }
+
+        .estado-select.pendiente { background-color: #fef3c7; color: #92400e; border-color: #fcd34d; }
+        .estado-select.parcial   { background-color: #ffedd5; color: #9a3412; border-color: #fdba74; }
+        .estado-select.entregado { background-color: #dcfce7; color: #166534; border-color: #86efac; }
+
+        /* ── Botones de acción ── */
+        .btn-detalle {
+            padding: 7px 14px;
+            background: #f1f5f9;
+            color: #334155;
+            border: 1.5px solid #e2e8f0;
+            border-radius: 8px;
+            font-family: 'Inter', sans-serif;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        .btn-tiempo {
+            padding: 7px 12px;
+            background: #eff6ff;
+            color: #1d4ed8;
+            border: 1.5px solid #bfdbfe;
+            border-radius: 8px;
+            font-family: 'Inter', sans-serif;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        .acciones { display: flex; gap: 6px; align-items: center; }
+
+        .sin-registros {
+            text-align: center;
+            padding: 60px 20px;
+            color: #94a3b8;
+            font-size: 15px;
+            background: white;
+            border-radius: 12px;
+        }
+
+        /* ── Panel lateral de detalle ── */
+        .overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.4);
+            z-index: 200;
+        }
+
+        .overlay.visible { display: block; }
+
+        .panel-detalle {
+            position: fixed;
+            top: 0;
+            right: -420px;
+            width: 420px;
+            height: 100vh;
+            background: white;
+            z-index: 300;
+            box-shadow: -4px 0 24px rgba(0,0,0,0.12);
+            transition: right 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .panel-detalle.visible { right: 0; }
+
+        .panel-header {
+            background: #1e293b;
+            padding: 20px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
+        }
+
+        .panel-header h3 { color: white; font-size: 16px; font-weight: 700; }
+
+        .btn-cerrar-panel {
+            background: rgba(255,255,255,0.15);
+            border: none;
+            color: white;
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            font-size: 18px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .panel-body {
+            padding: 24px;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .detalle-seccion {
+            margin-bottom: 20px;
+        }
+
+        .detalle-seccion-titulo {
+            font-size: 11px;
+            font-weight: 700;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            margin-bottom: 10px;
+            padding-bottom: 6px;
+            border-bottom: 1px solid #f1f5f9;
+        }
+
+        .detalle-fila {
+            display: flex;
+            justify-content: space-between;
+            padding: 7px 0;
+            font-size: 14px;
+            border-bottom: 1px solid #f8fafc;
+            gap: 12px;
+        }
+
+        .detalle-key { color: #64748b; font-weight: 500; flex-shrink: 0; }
+        .detalle-val { color: #1e293b; font-weight: 600; text-align: right; white-space: pre-line; }
+
+        /* ── Panel editar en detalle ── */
+        .panel-editar { display: none; }
+        .panel-editar.visible { display: block; }
+        .panel-ver { display: block; }
+        .panel-ver.oculto { display: none; }
+
+        .editar-campo {
+            margin-bottom: 14px;
+        }
+
+        .editar-campo label {
+            display: block;
+            font-size: 12px;
+            font-weight: 600;
+            color: #475569;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+        }
+
+        .editar-campo textarea {
+            width: 100%;
+            background: #f8fafc;
+            border: 1.5px solid #e2e8f0;
+            border-radius: 8px;
+            font-family: 'Inter', sans-serif;
+            font-size: 13px;
+            padding: 10px;
+            resize: vertical;
+            color: #1e293b;
+        }
+
+        .editar-campo textarea:focus {
+            outline: none;
+            border-color: #3b82f6;
+        }
+
+        .panel-footer {
+            padding: 16px 24px;
+            border-top: 1px solid #e2e8f0;
+            display: flex;
+            gap: 10px;
+            flex-shrink: 0;
+        }
+
+        .btn-panel {
+            flex: 1;
+            padding: 12px;
+            border-radius: 10px;
+            font-family: 'Inter', sans-serif;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            transition: opacity 0.15s;
+        }
+
+        .btn-panel-primary { background: #1e293b; color: white; }
+        .btn-panel-secondary { background: #f1f5f9; color: #334155; border: 1.5px solid #e2e8f0; }
+
+        /* ── Botón general ── */
+        .btn { padding: 9px 18px; border-radius: 8px; font-family: 'Inter', sans-serif;
+               font-size: 14px; font-weight: 600; cursor: pointer; border: none; }
+        .btn-primary { background: #1e293b; color: white; }
+    </style>
+</head>
+<body>
+
+<!-- ── Login ── -->
+<div id="login-screen">
+    <div class="login-box">
+        <img src="css/IPN.png" alt="IPN">
+        <h2>Panel de Administrador</h2>
+        <p>Lab Bioingeniería — UPIITA</p>
+        <input type="password" id="password-input" placeholder="Contraseña" autocomplete="current-password">
+        <button class="btn btn-primary" style="width:100%" onclick="verificarPassword()">Entrar</button>
+    </div>
+</div>
+
+<!-- ── Panel ── -->
+<div id="panel">
+
+    <div class="header">
+        <div class="header-logos">
+            <img src="css/IPN.png" alt="IPN">
+        </div>
+        <h1>Panel de Administrador — Lab Bioingeniería</h1>
+        <div class="header-right">
+            <img src="css/UPIITA.png" alt="UPIITA" style="height:36px; filter:brightness(0) invert(1);">
+        </div>
+    </div>
+
+    <div class="controles">
+        <label for="filtro-fecha">Fecha:</label>
+        <input type="date" id="filtro-fecha">
+        <button class="btn-ctrl btn-primary" onclick="cargarRegistros()">Buscar</button>
+        <button class="btn-ctrl btn-secondary" onclick="cargarHoy()">Hoy</button>
+
+        <button class="btn-ctrl" onclick="abrirExportar()" style="background:#166534; color:white; margin-left:4px;">📥 Exportar Excel</button>
+
+        <div class="stats">
+            <div class="stat stat-pendiente">
+                <div class="stat-num" id="cnt-pendiente">—</div>
+                <div class="stat-label">Pendientes</div>
+            </div>
+            <div class="stat stat-parcial">
+                <div class="stat-num" id="cnt-parcial">—</div>
+                <div class="stat-label">Parciales</div>
+            </div>
+            <div class="stat stat-entregado">
+                <div class="stat-num" id="cnt-entregado">—</div>
+                <div class="stat-label">Entregados</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="tabla-wrap">
+        <table id="tabla-registros">
+            <thead>
+                <tr>
+                    <th>Hora</th>
+                    <th>Carrera</th>
+                    <th>Nombre</th>
+                    <th>Boleta</th>
+                    <th>Materia</th>
+                    <th>Profesor</th>
+                    <th>Mesa</th>
+                    <th>Estado</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody id="tabla-body">
+                <tr><td colspan="9"><div class="sin-registros">Selecciona una fecha para ver los registros.</div></td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- ── Overlay ── -->
+<div class="overlay" id="overlay" onclick="cerrarPanel()"></div>
+
+<!-- ── Panel lateral de detalle ── -->
+<div class="panel-detalle" id="panel-detalle">
+    <div class="panel-header">
+        <h3 id="panel-titulo">Detalle del registro</h3>
+        <button class="btn-cerrar-panel" onclick="cerrarPanel()">✕</button>
+    </div>
+
+    <div class="panel-body">
+        <!-- Vista detalle -->
+        <div class="panel-ver" id="panel-ver">
+            <div class="detalle-seccion">
+                <div class="detalle-seccion-titulo">Datos personales</div>
+                <div id="detalle-datos"></div>
+            </div>
+            <div class="detalle-seccion">
+                <div class="detalle-seccion-titulo">Material registrado</div>
+                <div id="detalle-material"></div>
+            </div>
+        </div>
+
+        <!-- Vista editar -->
+        <div class="panel-editar" id="panel-editar">
+            <div class="editar-campo">
+                <label>Equipos</label>
+                <textarea id="edit-equipos" rows="4"></textarea>
+            </div>
+            <div class="editar-campo">
+                <label>Puntas</label>
+                <textarea id="edit-puntas" rows="3"></textarea>
+            </div>
+            <div class="editar-campo">
+                <label>Herramientas</label>
+                <textarea id="edit-herramientas" rows="3"></textarea>
+            </div>
+        </div>
+    </div>
+
+    <div class="panel-footer" id="panel-footer-ver" style="flex-wrap:wrap; gap:8px;">
+        <button class="btn-panel btn-panel-secondary" onclick="activarEdicion()" style="flex:1">✎ Editar</button>
+        <button class="btn-panel btn-panel-primary"   onclick="extenderTiempo()" style="flex:1">⏱ +3h</button>
+        <button class="btn-panel" onclick="eliminarRegistro()" style="flex:1 1 100%; background:#fee2e2; color:#991b1b; border:1.5px solid #fca5a5;">🗑 Eliminar registro</button>
+    </div>
+
+    <div class="panel-footer" id="panel-footer-editar" style="display:none">
+        <button class="btn-panel btn-panel-secondary" onclick="cancelarEdicion()">Cancelar</button>
+        <button class="btn-panel btn-panel-primary"   onclick="guardarEdicion()">Guardar</button>
+    </div>
+</div>
+
+<script>
+    const SUPABASE_URL = 'https://yzhdtwdwakzcnlergcpk.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_7-8BuHvJF63KH6T2xavAEA_euEHKqC-';
+    const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    // Hash SHA-256 de la contraseña (nunca guardes la contraseña en texto plano)
+    // Contraseña actual: labbioing2024
+    // Para cambiarla: genera un nuevo hash en https://emn178.github.io/online-tools/sha256.html
+    const PASSWORD_HASH = 'ef449652ef4a87a5fad1b8f72a791e371ee4722bd7540dc791ae1ac36af39dfc';
+
+    let registroActivo = null;
+
+    // ── Login ──────────────────────────────────────────────────────────────────
+
+    async function hashear(texto) {
+        const encoder = new TextEncoder();
+        const data = encoder.encode(texto);
+        const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+        return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2,'0')).join('');
+    }
+
+    async function verificarPassword() {
+        const input = document.getElementById('password-input').value;
+        const hash = await hashear(input);
+        if (hash === PASSWORD_HASH) {
+            document.getElementById('login-screen').style.display = 'none';
+            document.getElementById('panel').style.display = 'block';
+            cargarHoy();
+        } else {
+            Swal.fire({ toast: true, position: 'top', icon: 'error',
+                title: 'Contraseña incorrecta', showConfirmButton: false, timer: 2000 });
+        }
+    }
+
+    document.getElementById('password-input').addEventListener('keydown', e => {
+        if (e.key === 'Enter') verificarPassword();
+    });
+
+    // ── Cargar registros ───────────────────────────────────────────────────────
+
+    function cargarHoy() {
+        const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' });
+        document.getElementById('filtro-fecha').value = hoy;
+        cargarRegistros();
+    }
+
+    async function cargarRegistros() {
+        const fecha = document.getElementById('filtro-fecha').value;
+        if (!fecha) { Swal.fire({ toast: true, position: 'top', icon: 'warning',
+            title: 'Selecciona una fecha', showConfirmButton: false, timer: 2000 }); return; }
+
+        const { data, error } = await db.from('registros').select('*')
+            .eq('fecha', fecha).order('created_at', { ascending: true });
+
+        if (error) { Swal.fire('Error', error.message, 'error'); return; }
+
+        actualizarStats(data || []);
+        renderizarTabla(data || []);
+    }
+
+    function actualizarStats(registros) {
+        document.getElementById('cnt-pendiente').textContent  = registros.filter(r => r.estado === 'pendiente').length;
+        document.getElementById('cnt-parcial').textContent    = registros.filter(r => r.estado === 'parcial').length;
+        document.getElementById('cnt-entregado').textContent  = registros.filter(r => r.estado === 'entregado').length;
+    }
+
+    function renderizarTabla(registros) {
+        const tbody = document.getElementById('tabla-body');
+
+        if (!registros.length) {
+            tbody.innerHTML = '<tr><td colspan="9"><div class="sin-registros">No hay registros para esta fecha.</div></td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = registros.map(r => `
+            <tr class="${r.estado}" id="fila-${r.id}">
+                <td>${formatearHora(r.created_at)}</td>
+                <td>${r.carrera || '—'}</td>
+                <td><strong>${r.nombre || ''}</strong></td>
+                <td>${r.boleta || ''}</td>
+                <td>${r.materia || ''}</td>
+                <td>${r.profesor || ''}</td>
+                <td>${r.mesa_de_trabajo || ''}</td>
+                <td>
+                    <select class="estado-select ${r.estado}" onchange="cambiarEstado('${r.id}', this.value, this)" onclick="event.stopPropagation()">
+                        <option value="pendiente"  ${r.estado === 'pendiente'  ? 'selected' : ''}>⏳ Pendiente</option>
+                        <option value="parcial"    ${r.estado === 'parcial'    ? 'selected' : ''}>📦 Parcial</option>
+                        <option value="entregado"  ${r.estado === 'entregado'  ? 'selected' : ''}>✅ Entregado</option>
+                    </select>
+                </td>
+                <td>
+                    <div class="acciones">
+                        <button class="btn-detalle" onclick="abrirPanel('${r.id}'); event.stopPropagation()">Ver detalle</button>
+                    </div>
+                </td>
+            </tr>
+        `).join('');
+
+        // Click en fila abre detalle
+        registros.forEach(r => {
+            document.getElementById(`fila-${r.id}`).addEventListener('click', () => abrirPanel(r.id));
+        });
+    }
+
+    // ── Cambiar estado ─────────────────────────────────────────────────────────
+
+    async function cambiarEstado(id, nuevoEstado, selectEl) {
+        const { error } = await db.from('registros').update({ estado: nuevoEstado }).eq('id', id);
+        if (error) { Swal.fire('Error', error.message, 'error'); return; }
+
+        const fila = document.getElementById(`fila-${id}`);
+        fila.className = nuevoEstado;
+
+        if (selectEl) {
+            selectEl.className = `estado-select ${nuevoEstado}`;
+        }
+
+        cargarRegistros();
+    }
+
+    // ── Panel lateral ──────────────────────────────────────────────────────────
+
+    async function abrirPanel(id) {
+        const { data, error } = await db.from('registros').select('*').eq('id', id).single();
+        if (error || !data) return;
+
+        registroActivo = data;
+        cancelarEdicion();
+
+        document.getElementById('panel-titulo').textContent = `Registro — ${data.nombre}`;
+
+        document.getElementById('detalle-datos').innerHTML = [
+            ['ID interno', data.id],
+            ['Fecha',    data.fecha],
+            ['Carrera',  data.carrera  || '—'],
+            ['Boleta',   data.boleta],
+            ['Materia',  data.materia],
+            ['Profesor', data.profesor],
+            ['Mesa',     data.mesa_de_trabajo || '—'],
+            ['Hora',     formatearHora(data.created_at)],
+        ].map(([k,v]) => `
+            <div class="detalle-fila">
+                <span class="detalle-key">${k}</span>
+                <span class="detalle-val">${v}</span>
+            </div>
+        `).join('');
+
+        document.getElementById('detalle-material').innerHTML = [
+            ['Equipos',      data.equipos     || '—'],
+            ['Puntas',       data.puntas      || '—'],
+            ['Herramientas', data.herramienta || '—'],
+        ].map(([k,v]) => `
+            <div class="detalle-fila">
+                <span class="detalle-key">${k}</span>
+                <span class="detalle-val">${v}</span>
+            </div>
+        `).join('');
+
+        document.getElementById('panel-detalle').classList.add('visible');
+        document.getElementById('overlay').classList.add('visible');
+    }
+
+    function cerrarPanel() {
+        document.getElementById('panel-detalle').classList.remove('visible');
+        document.getElementById('overlay').classList.remove('visible');
+        registroActivo = null;
+    }
+
+    // ── Editar material ────────────────────────────────────────────────────────
+
+    function activarEdicion() {
+        if (!registroActivo) return;
+        document.getElementById('edit-equipos').value      = registroActivo.equipos || '';
+        document.getElementById('edit-puntas').value       = registroActivo.puntas || '';
+        document.getElementById('edit-herramientas').value = registroActivo.herramienta || '';
+
+        document.getElementById('panel-ver').classList.add('oculto');
+        document.getElementById('panel-editar').classList.add('visible');
+        document.getElementById('panel-footer-ver').style.display    = 'none';
+        document.getElementById('panel-footer-editar').style.display = 'flex';
+    }
+
+    function cancelarEdicion() {
+        document.getElementById('panel-ver').classList.remove('oculto');
+        document.getElementById('panel-editar').classList.remove('visible');
+        document.getElementById('panel-footer-ver').style.display    = 'flex';
+        document.getElementById('panel-footer-editar').style.display = 'none';
+    }
+
+    async function guardarEdicion() {
+        if (!registroActivo) return;
+
+        const { error } = await db.from('registros').update({
+            equipos:     document.getElementById('edit-equipos').value,
+            puntas:      document.getElementById('edit-puntas').value,
+            herramienta: document.getElementById('edit-herramientas').value,
+            estado:      'parcial'
+        }).eq('id', registroActivo.id);
+
+        if (error) { Swal.fire('Error', error.message, 'error'); return; }
+
+        Swal.fire({ toast: true, position: 'top', icon: 'success',
+            title: 'Material actualizado', showConfirmButton: false, timer: 2000 });
+
+        cerrarPanel();
+        cargarRegistros();
+    }
+
+    // ── Extender tiempo ────────────────────────────────────────────────────────
+
+    async function extenderTiempo() {
+        if (!registroActivo) return;
+
+        const { isConfirmed } = await Swal.fire({
+            title: '¿Extender tiempo?',
+            text: `El alumno ${registroActivo.nombre} tendrá 3 horas adicionales para modificar su registro.`,
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonText: 'Sí, extender',
+            confirmButtonColor: '#1e293b',
+            cancelButtonText: 'Cancelar'
+        });
+
+        if (!isConfirmed) return;
+
+        const { error } = await db.from('registros')
+            .update({ created_at: new Date().toISOString() })
+            .eq('id', registroActivo.id);
+
+        if (error) { Swal.fire('Error', error.message, 'error'); return; }
+
+        Swal.fire({ toast: true, position: 'top', icon: 'success',
+            title: 'Tiempo extendido', showConfirmButton: false, timer: 2000 });
+        cerrarPanel();
+    }
+
+    // ── Eliminar registro ──────────────────────────────────────────────────────
+
+    async function eliminarRegistro() {
+        if (!registroActivo) return;
+
+        const { isConfirmed } = await Swal.fire({
+            title: '¿Eliminar registro?',
+            html: `Se eliminará el registro de <strong>${registroActivo.nombre}</strong>.<br>Esta acción no se puede deshacer.`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonText: 'Sí, eliminar',
+            confirmButtonColor: '#dc2626',
+            cancelButtonText: 'Cancelar'
+        });
+
+        if (!isConfirmed) return;
+
+        const { error } = await db.from('registros').delete().eq('id', registroActivo.id);
+        if (error) { Swal.fire('Error', error.message, 'error'); return; }
+
+        Swal.fire({ toast: true, position: 'top', icon: 'success',
+            title: 'Registro eliminado', showConfirmButton: false, timer: 2000 });
+
+        cerrarPanel();
+        cargarRegistros();
+    }
+
+    // ── Exportar a Excel ───────────────────────────────────────────────────────
+
+    async function abrirExportar() {
+        const { value: fechas } = await Swal.fire({
+            title: 'Exportar a Excel',
+            html: `
+                <div style="text-align:left; font-family:Inter,sans-serif;">
+                    <label style="font-size:13px; font-weight:600; color:#475569; display:block; margin-bottom:4px;">Fecha inicio</label>
+                    <input type="date" id="exp-inicio" class="swal2-input" style="margin:0 0 12px; width:100%">
+                    <label style="font-size:13px; font-weight:600; color:#475569; display:block; margin-bottom:4px;">Fecha fin</label>
+                    <input type="date" id="exp-fin" class="swal2-input" style="margin:0; width:100%">
+                </div>`,
+            confirmButtonText: 'Exportar',
+            confirmButtonColor: '#166534',
+            showCancelButton: true,
+            cancelButtonText: 'Cancelar',
+            preConfirm: () => {
+                const inicio = document.getElementById('exp-inicio').value;
+                const fin    = document.getElementById('exp-fin').value;
+                if (!inicio || !fin) {
+                    Swal.showValidationMessage('Selecciona ambas fechas');
+                    return false;
+                }
+                if (inicio > fin) {
+                    Swal.showValidationMessage('La fecha inicio no puede ser mayor a la fecha fin');
+                    return false;
+                }
+                return { inicio, fin };
+            }
+        });
+
+        if (!fechas) return;
+
+        const { data, error } = await db.from('registros')
+            .select('*')
+            .gte('fecha', fechas.inicio)
+            .lte('fecha', fechas.fin)
+            .order('fecha', { ascending: true })
+            .order('created_at', { ascending: true });
+
+        if (error) { Swal.fire('Error', error.message, 'error'); return; }
+        if (!data || data.length === 0) {
+            Swal.fire('Sin datos', 'No hay registros en ese rango de fechas.', 'info');
+            return;
+        }
+
+        const filas = data.map(r => ({
+            'ID':           r.id,
+            'Fecha':        r.fecha,
+            'Hora':         formatearHora(r.created_at),
+            'Carrera':      r.carrera      || '',
+            'Nombre':       r.nombre       || '',
+            'Boleta':       r.boleta       || '',
+            'Materia':      r.materia      || '',
+            'Profesor':     r.profesor     || '',
+            'Mesa':         r.mesa_de_trabajo || '',
+            'Equipos':      r.equipos      || '',
+            'Puntas':       r.puntas       || '',
+            'Herramientas': r.herramienta  || '',
+            'Estado':       r.estado       || ''
+        }));
+
+        const hoja  = XLSX.utils.json_to_sheet(filas);
+        const libro = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(libro, hoja, 'Registros');
+
+        // Ancho de columnas automático
+        const anchos = Object.keys(filas[0]).map(k => ({ wch: Math.max(k.length, 14) }));
+        hoja['!cols'] = anchos;
+
+        const nombreArchivo = `lab_bioing_${fechas.inicio}_${fechas.fin}.xlsx`;
+        XLSX.writeFile(libro, nombreArchivo);
+
+        Swal.fire({ toast: true, position: 'top', icon: 'success',
+            title: `${data.length} registros exportados`, showConfirmButton: false, timer: 3000 });
+    }
+
+    // ── Helpers ────────────────────────────────────────────────────────────────
+
+    function formatearHora(ts) {
+        if (!ts) return '—';
+        return new Date(ts).toLocaleTimeString('es-MX', {
+            timeZone: 'America/Mexico_City', hour: '2-digit', minute: '2-digit'
+        });
+    }
+</script>
+</body>
+</html>

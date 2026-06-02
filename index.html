@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <title>Registro Laboratorio Bioingeniería</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #f0f4f8;
+            min-height: 100vh;
+            padding-bottom: calc(100px + env(safe-area-inset-bottom));
+            -webkit-text-size-adjust: 100%;
+        }
+
+        /* ── Header ── */
+        .header {
+            background: #1e293b;
+            padding: 16px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .header img {
+            width: 48px;
+            height: 48px;
+            object-fit: contain;
+            filter: brightness(0) invert(1);
+        }
+
+        .header h1 {
+            color: white;
+            font-size: 14px;
+            font-weight: 600;
+            text-align: center;
+            line-height: 1.4;
+            flex: 1;
+        }
+
+        /* ── Progress bar ── */
+        .progress-container {
+            background: #1e293b;
+            padding: 0 20px 20px;
+        }
+
+        .steps-labels {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+
+        .step-label {
+            font-size: 11px;
+            color: rgba(255,255,255,0.4);
+            font-weight: 500;
+            transition: color 0.3s;
+        }
+
+        .step-label.active { color: #7dd3fc; }
+        .step-label.done   { color: rgba(255,255,255,0.7); }
+
+        .progress-track {
+            background: rgba(255,255,255,0.15);
+            border-radius: 99px;
+            height: 4px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            background: #7dd3fc;
+            height: 100%;
+            border-radius: 99px;
+            transition: width 0.4s ease;
+        }
+
+        /* ── Contenido ── */
+        .content {
+            max-width: 480px;
+            margin: 0 auto;
+            padding: 24px 16px 0;
+        }
+
+        /* ── Tarjeta de paso ── */
+        .step { display: none; }
+        .step.active { display: block; }
+
+        .step-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: #1e293b;
+            margin-bottom: 4px;
+        }
+
+        .step-subtitle {
+            font-size: 13px;
+            color: #64748b;
+            margin-bottom: 20px;
+        }
+
+        /* ── Campos ── */
+        .field {
+            margin-bottom: 16px;
+        }
+
+        .field label {
+            display: block;
+            font-size: 12px;
+            font-weight: 600;
+            color: #475569;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 6px;
+        }
+
+        .field input,
+        .field select {
+            width: 100%;
+            padding: 13px 14px;
+            border: 1.5px solid #e2e8f0;
+            border-radius: 10px;
+            font-family: 'Inter', sans-serif;
+            font-size: 16px; /* Mínimo 16px para evitar zoom en iOS Safari */
+            color: #1e293b;
+            background: white;
+            transition: border-color 0.2s, box-shadow 0.2s;
+            -webkit-appearance: none;
+            appearance: none;
+        }
+
+        .field select {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 14px center;
+            padding-right: 40px;
+        }
+
+        .field input:focus,
+        .field select:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59,130,246,0.12);
+        }
+
+        .field input::placeholder { color: #cbd5e1; }
+
+        /* ── Sección de equipos ── */
+        .seccion-titulo {
+            font-size: 13px;
+            font-weight: 700;
+            color: #334155;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            margin: 20px 0 10px;
+            padding-bottom: 6px;
+            border-bottom: 2px solid #e2e8f0;
+        }
+
+        /* ── Checkbox items ── */
+        .check-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: white;
+            border: 1.5px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 14px 16px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: border-color 0.2s, background 0.2s;
+        }
+
+        .check-item:has(input:checked) {
+            border-color: #3b82f6;
+            background: #eff6ff;
+        }
+
+        .check-item-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex: 1;
+        }
+
+        .check-item input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            accent-color: #3b82f6;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+
+        .check-item-label {
+            font-size: 15px;
+            color: #1e293b;
+            font-weight: 500;
+            cursor: pointer;
+        }
+
+        .check-item input[type="number"] {
+            width: 64px;
+            padding: 6px 10px;
+            border: 1.5px solid #cbd5e1;
+            border-radius: 8px;
+            font-family: 'Inter', sans-serif;
+            font-size: 16px;
+            text-align: center;
+            color: #1e293b;
+            background: white;
+            -webkit-appearance: none;
+            appearance: none;
+        }
+
+        .check-item input[type="number"]:focus {
+            outline: none;
+            border-color: #3b82f6;
+        }
+
+        /* ── Herramientas ── */
+        .herramientas-input-row {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .herramientas-input-row input {
+            flex: 1;
+            padding: 13px 14px;
+            border: 1.5px solid #e2e8f0;
+            border-radius: 10px;
+            font-family: 'Inter', sans-serif;
+            font-size: 16px;
+            color: #1e293b;
+            background: white;
+            -webkit-appearance: none;
+            appearance: none;
+        }
+
+        .herramientas-input-row input:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59,130,246,0.12);
+        }
+
+        .btn-agregar {
+            padding: 13px 16px;
+            background: #1e293b;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-family: 'Inter', sans-serif;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        .herramienta-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: #e2e8f0;
+            color: #334155;
+            padding: 6px 10px;
+            border-radius: 99px;
+            font-size: 13px;
+            font-weight: 500;
+            margin: 4px 4px 4px 0;
+        }
+
+        .herramienta-tag button {
+            background: none;
+            border: none;
+            color: #64748b;
+            cursor: pointer;
+            font-size: 14px;
+            line-height: 1;
+            padding: 0;
+            display: flex;
+            align-items: center;
+        }
+
+        /* ── Resumen ── */
+        .resumen-card {
+            background: white;
+            border: 1.5px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 16px;
+            margin-bottom: 10px;
+        }
+
+        .resumen-fila {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            padding: 6px 0;
+            border-bottom: 1px solid #f1f5f9;
+            font-size: 14px;
+            gap: 12px;
+        }
+
+        .resumen-fila:last-child { border-bottom: none; }
+
+        .resumen-key {
+            color: #64748b;
+            font-weight: 500;
+            flex-shrink: 0;
+            min-width: 100px;
+        }
+
+        .resumen-val {
+            color: #1e293b;
+            font-weight: 600;
+            text-align: right;
+            white-space: pre-line;
+        }
+
+        /* ── Botones de navegación ── */
+        .nav-btns {
+            display: flex;
+            gap: 10px;
+            margin-top: 28px;
+            padding-bottom: 8px;
+        }
+
+        .btn-back {
+            flex: 1;
+            padding: 15px;
+            background: white;
+            color: #334155;
+            border: 1.5px solid #e2e8f0;
+            border-radius: 12px;
+            font-family: 'Inter', sans-serif;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .btn-next {
+            flex: 2;
+            padding: 15px;
+            background: #1e293b;
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-family: 'Inter', sans-serif;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .btn-next:active { background: #0f172a; }
+        .btn-back:active  { background: #f1f5f9; }
+
+        .btn-submit {
+            width: 100%;
+            padding: 16px;
+            background: #2563eb;
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-family: 'Inter', sans-serif;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            margin-top: 28px;
+            transition: background 0.2s;
+        }
+
+        .btn-submit:active { background: #1d4ed8; }
+
+        /* ── Pantalla de bienvenida ── */
+        .bienvenida {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: calc(100vh - 80px);
+            padding: 32px 20px;
+            text-align: center;
+        }
+
+        .bienvenida-titulo {
+            font-size: 22px;
+            font-weight: 700;
+            color: #1e293b;
+            margin-bottom: 8px;
+        }
+
+        .bienvenida-subtitulo {
+            font-size: 14px;
+            color: #64748b;
+            margin-bottom: 48px;
+            line-height: 1.5;
+        }
+
+        .bienvenida-btns {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            width: 100%;
+            max-width: 320px;
+        }
+
+        .btn-bienvenida-primary {
+            padding: 18px;
+            background: #1e293b;
+            color: white;
+            border: none;
+            border-radius: 14px;
+            font-family: 'Inter', sans-serif;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .btn-bienvenida-primary:active { background: #0f172a; }
+
+        .btn-bienvenida-secondary {
+            padding: 18px;
+            background: white;
+            color: #1e293b;
+            border: 2px solid #e2e8f0;
+            border-radius: 14px;
+            font-family: 'Inter', sans-serif;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: border-color 0.2s, background 0.2s;
+        }
+
+        .btn-bienvenida-secondary:active { background: #f8fafc; }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <img src="css/IPN.png" alt="IPN">
+    <h1>Registro Laboratorio<br>de Bioingeniería</h1>
+    <img src="css/UPIITA.png" alt="UPIITA">
+</div>
+
+<div class="progress-container" id="progress-container" style="display:none">
+    <div class="steps-labels">
+        <span class="step-label active" id="label-1">Datos</span>
+        <span class="step-label" id="label-2">Equipos</span>
+        <span class="step-label" id="label-3">Confirmar</span>
+    </div>
+    <div class="progress-track">
+        <div class="progress-fill" id="progress-fill" style="width: 33%"></div>
+    </div>
+</div>
+
+<!-- ── Pantalla de bienvenida ── -->
+<div id="pantalla-bienvenida" class="content">
+    <div class="bienvenida">
+        <p class="bienvenida-titulo">¿Qué deseas hacer?</p>
+        <p class="bienvenida-subtitulo">Selecciona una opción para continuar.</p>
+        <div class="bienvenida-btns">
+            <button class="btn-bienvenida-primary" onclick="mostrarFormulario()">
+                📋 Nuevo registro
+            </button>
+            <button class="btn-bienvenida-secondary" id="btn-modificar">
+                ✏️ Modificar mi registro
+            </button>
+        </div>
+    </div>
+</div>
+
+<div id="contenedor-formulario" style="display:none;">
+<div class="content">
+<form id="formulario-registro">
+
+    <!-- ── Paso 1: Datos personales ── -->
+    <div class="step active" id="paso-1">
+        <p class="step-title">Datos personales</p>
+        <p class="step-subtitle">Ingresa tu información para el registro.</p>
+
+        <div class="field">
+            <label for="fecha">Fecha</label>
+            <input type="date" id="fecha" name="fecha" required>
+        </div>
+
+        <div class="field">
+            <label for="carrera">Carrera</label>
+            <select id="carrera" name="carrera" required>
+                <option value="" disabled selected>Selecciona tu carrera</option>
+                <option value="Biónica">Biónica</option>
+                <option value="Mecatrónica">Mecatrónica</option>
+                <option value="Telemática">Telemática</option>
+                <option value="ISISA">ISISA</option>
+            </select>
+        </div>
+
+        <div class="field">
+            <label for="nombre">Nombre completo</label>
+            <input type="text" id="nombre" name="nombre" placeholder="Tu nombre" required>
+        </div>
+
+        <div class="field">
+            <label for="boleta">Boleta</label>
+            <input type="text" id="boleta" name="boleta" placeholder="Número de boleta" required>
+        </div>
+
+        <div class="field">
+            <label for="materia">Materia</label>
+            <input type="text" id="materia" name="materia" placeholder="Nombre de la materia" required>
+        </div>
+
+        <div class="field">
+            <label for="profesor">Profesor</label>
+            <input type="text" id="profesor" name="profesor" placeholder="Nombre del profesor" required>
+        </div>
+
+        <div class="field">
+            <label for="mesa_trabajo">Mesa de trabajo</label>
+            <input type="text" id="mesa_trabajo" name="mesa_trabajo" placeholder="Número de mesa" required>
+        </div>
+
+        <div class="nav-btns">
+            <button type="button" class="btn-next" onclick="irPaso(2)">Siguiente →</button>
+        </div>
+    </div>
+
+    <!-- ── Paso 2: Equipos ── -->
+    <div class="step" id="paso-2">
+        <p class="step-title">Equipos y material</p>
+        <p class="step-subtitle">Selecciona lo que vas a utilizar.</p>
+
+        <p class="seccion-titulo">Equipos</p>
+
+        <label class="check-item">
+            <div class="check-item-left">
+                <input type="checkbox" id="osciloscopio" name="herramientas" value="Osciloscopio">
+                <span class="check-item-label">Osciloscopio</span>
+            </div>
+        </label>
+
+        <label class="check-item">
+            <div class="check-item-left">
+                <input type="checkbox" id="generador_funciones" name="herramientas" value="Generador de Funciones">
+                <span class="check-item-label">Generador de Funciones</span>
+            </div>
+        </label>
+
+        <label class="check-item">
+            <div class="check-item-left">
+                <input type="checkbox" id="fuente_alimentacion" name="herramientas" value="Fuente de Alimentacion">
+                <span class="check-item-label">Fuente de Alimentación</span>
+            </div>
+        </label>
+
+        <label class="check-item">
+            <div class="check-item-left">
+                <input type="checkbox" id="multimetro" name="herramientas" value="Multimetro">
+                <span class="check-item-label">Multímetro</span>
+            </div>
+        </label>
+
+        <label class="check-item">
+            <div class="check-item-left">
+                <input type="checkbox" id="generador_am_fm" name="herramientas" value="Generador AM-FM">
+                <span class="check-item-label">Generador AM-FM</span>
+            </div>
+        </label>
+
+        <p class="seccion-titulo">Puntas</p>
+
+        <label class="check-item">
+            <div class="check-item-left">
+                <input type="checkbox" id="puntas_bnc_caiman_check" name="herramientas" value="Puntas BNC-Caiman">
+                <span class="check-item-label">BNC-Caiman</span>
+            </div>
+            <input type="number" id="puntas_bnc_caiman" name="puntas_bnc_caiman" min="1" placeholder="Cant." style="display:none;">
+        </label>
+
+        <label class="check-item">
+            <div class="check-item-left">
+                <input type="checkbox" id="puntas_banana_caiman_check" name="herramientas" value="Puntas Banana-Caiman">
+                <span class="check-item-label">Banana-Caiman</span>
+            </div>
+            <input type="number" id="puntas_banana_caiman" name="puntas_banana_caiman" min="1" placeholder="Cant." style="display:none;">
+        </label>
+
+        <label class="check-item">
+            <div class="check-item-left">
+                <input type="checkbox" id="puntas_caiman_caiman_check" name="herramientas" value="Puntas Caiman-Caiman">
+                <span class="check-item-label">Caiman-Caiman</span>
+            </div>
+            <input type="number" id="puntas_caiman_caiman" name="puntas_caiman_caiman" min="1" placeholder="Cant." style="display:none;">
+        </label>
+
+        <p class="seccion-titulo">Herramientas adicionales</p>
+        <div class="herramientas-input-row">
+            <input type="text" id="herramienta-input" placeholder="Ej: cables, protoboard...">
+            <button type="button" class="btn-agregar" id="agregar-herramienta">+ Agregar</button>
+        </div>
+        <div id="lista-herramientas"></div>
+
+        <div class="nav-btns">
+            <button type="button" class="btn-back" onclick="irPaso(1)">← Atrás</button>
+            <button type="button" class="btn-next" onclick="irPaso(3)">Siguiente →</button>
+        </div>
+    </div>
+
+    <!-- ── Paso 3: Resumen ── -->
+    <div class="step" id="paso-3">
+        <p class="step-title">Confirma tu registro</p>
+        <p class="step-subtitle">Revisa que todo esté correcto antes de enviar.</p>
+
+        <div class="resumen-card" id="resumen-datos"></div>
+        <div class="resumen-card" id="resumen-equipos"></div>
+
+        <button type="submit" class="btn-submit" id="btn-registro">Enviar registro</button>
+        <button type="button" class="btn-back" id="btn-guardar" style="display:none; width:100%; margin-top:10px;" onclick="guardarModificacion()">Guardar cambios</button>
+
+        <div class="nav-btns">
+            <button type="button" class="btn-back" onclick="irPaso(2)">← Atrás</button>
+        </div>
+    </div>
+
+</form>
+</div>
+</div>
+
+<script src="js/app.js"></script>
+</body>
+</html>
