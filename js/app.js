@@ -139,7 +139,6 @@ function recopilarDatos() {
 document.getElementById('formulario-registro').addEventListener('submit', async (e) => {
     e.preventDefault();
 
-    const id = generarIdUnico();
     const { equipos, puntas, herramienta } = recopilarDatos();
 
     // Capturar datos para el resumen ANTES de limpiar el formulario
@@ -147,8 +146,7 @@ document.getElementById('formulario-registro').addEventListener('submit', async 
     const mesa        = document.getElementById('mesa_trabajo').value;
     const integrantes = document.getElementById('integrantes').value;
 
-    const { error } = await db.from('registros').insert([{
-        id,
+    const { error } = await insertarConIdUnico({
         fecha:           document.getElementById('fecha').value,
         carrera:         document.getElementById('carrera').value,
         nombre,
@@ -161,7 +159,7 @@ document.getElementById('formulario-registro').addEventListener('submit', async 
         puntas,
         herramienta,
         estado: 'pendiente'
-    }]);
+    });
 
     // Si el service worker guardó en cola (sin internet), la respuesta trae {queued: true}
     const sinInternet = error && error.message && error.message.includes('fetch');
@@ -231,15 +229,27 @@ document.getElementById('formulario-registro').addEventListener('submit', async 
 
 // ── Generar ID único ──────────────────────────────────────────────────────────
 
-function generarIdUnico() {
+function generarIdUnico(longitud = 3) {
     const letras = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
     let id = '';
     do {
         id = '';
-        for (let i = 0; i < 3; i++) id += letras[Math.floor(Math.random() * letras.length)];
+        for (let i = 0; i < longitud; i++) id += letras[Math.floor(Math.random() * letras.length)];
     } while (idYaExiste(id));
     guardarId(id);
     return id;
+}
+
+// Inserta el registro; si el ID ya lo tiene otro registro (error 23505),
+// genera otro y reintenta. Tras varios choques usa 4 letras (456,976 combinaciones).
+async function insertarConIdUnico(datos) {
+    let error = null;
+    for (let intento = 0; intento < 15; intento++) {
+        const id = generarIdUnico(intento < 8 ? 3 : 4);
+        ({ error } = await db.from('registros').insert([{ id, ...datos }]));
+        if (!error || error.code !== '23505') return { id, error };
+    }
+    return { error };
 }
 
 function idYaExiste(id) {
