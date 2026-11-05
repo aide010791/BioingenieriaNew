@@ -192,3 +192,18 @@ o borra el usuario y créalo de nuevo con otra contraseña.
   - Sección "Historial de cambios" en el panel lateral de detalle.
   - Hoja "Historial de cambios" en el Excel exportado (cambios hechos en el rango de fechas).
 - La exportación a Excel descarga en bloques de 1000 para no cortar reportes grandes (semestre).
+
+## Reporte de uso (botón "📊 Reporte de uso" en el panel)
+
+- Pide un rango de fechas y muestra: total de registros, alumnos distintos (por boleta),
+  personas (sumando integrantes), días con actividad, y conteos de **equipos**, **puntas**
+  (veces prestadas y piezas totales), **herramientas adicionales**, **carreras** y **materias**.
+- Agrupa variantes de escritura (mayúsculas, acentos, espacios) para no duplicar conteos.
+- Botón para descargar el reporte en Excel (hojas: Resumen, Equipos, Puntas, Herramientas,
+  Por carrera, Por materia).
+
+## IDs de registro
+
+- Se generan con 3 letras; si el ID ya existe en la base de datos (error 23505), el formulario
+  genera otro y reintenta automáticamente. Después de 8 choques usa 4 letras.
+- La regla RLS acepta IDs de 3 o 4 letras mayúsculas (`^[A-Z]{3,4}$`).

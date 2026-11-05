@@ -391,6 +391,19 @@
         .hist-despues{ color: #15803d; font-weight: 600; white-space: pre-line; }
         .hist-vacio  { font-size: 13px; color: #94a3b8; }
 
+        /* ── Reporte de uso ── */
+        .rep { text-align: left; font-family: 'Inter', sans-serif; font-size: 13px; color: #1e293b; }
+        .rep-totales { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; margin-bottom: 16px; }
+        .rep-total { background: #f1f5f9; border-radius: 10px; padding: 10px; text-align: center; }
+        .rep-total b { display: block; font-size: 22px; color: #1e40af; }
+        .rep-total span { font-size: 11px; color: #64748b; }
+        .rep h4 { font-size: 12px; text-transform: uppercase; letter-spacing: .5px; color: #64748b; margin: 14px 0 6px; }
+        .rep table { width: 100%; border-collapse: collapse; }
+        .rep th, .rep td { padding: 5px 8px; border-bottom: 1px solid #f1f5f9; }
+        .rep th { font-size: 11px; color: #94a3b8; text-align: left; font-weight: 600; }
+        .rep td.num, .rep th.num { text-align: right; font-variant-numeric: tabular-nums; }
+        .rep .nota { font-size: 11px; color: #94a3b8; margin-top: 12px; }
+
         /* ── Panel editar en detalle ── */
         .panel-editar { display: none; }
         .panel-editar.visible { display: block; }
@@ -491,6 +504,7 @@
         <button class="btn-ctrl btn-secondary" onclick="cargarHoy()">Hoy</button>
 
         <button class="btn-ctrl" onclick="abrirExportar()" style="background:#166534; color:white; margin-left:4px;">📥 Exportar Excel</button>
+        <button class="btn-ctrl" onclick="abrirReporte()" style="background:#1e40af; color:white; margin-left:4px;">📊 Reporte de uso</button>
 
         <div class="stats">
             <div class="stat stat-pendiente">
@@ -1064,6 +1078,150 @@
 
         Swal.fire({ toast: true, position: 'top', icon: 'success',
             title: `${data.length} registros exportados`, showConfirmButton: false, timer: 3000 });
+    }
+
+    // ── Reporte de uso (material y equipo por rango de fechas) ─────────────────
+
+    async function pedirRango(titulo, textoBoton, color) {
+        const { value } = await Swal.fire({
+            title: titulo,
+            html: `
+                <div style="text-align:left; font-family:Inter,sans-serif;">
+                    <label style="font-size:13px; font-weight:600; color:#475569; display:block; margin-bottom:4px;">Fecha inicio</label>
+                    <input type="date" id="rango-inicio" class="swal2-input" style="margin:0 0 12px; width:100%">
+                    <label style="font-size:13px; font-weight:600; color:#475569; display:block; margin-bottom:4px;">Fecha fin</label>
+                    <input type="date" id="rango-fin" class="swal2-input" style="margin:0; width:100%">
+                </div>`,
+            confirmButtonText: textoBoton,
+            confirmButtonColor: color,
+            showCancelButton: true,
+            cancelButtonText: 'Cancelar',
+            preConfirm: () => {
+                const inicio = document.getElementById('rango-inicio').value;
+                const fin    = document.getElementById('rango-fin').value;
+                if (!inicio || !fin) { Swal.showValidationMessage('Selecciona ambas fechas'); return false; }
+                if (inicio > fin)    { Swal.showValidationMessage('La fecha inicio no puede ser mayor a la fecha fin'); return false; }
+                return { inicio, fin };
+            }
+        });
+        return value;
+    }
+
+    // Cuenta elementos agrupando variantes de escritura ("Multímetro" = "multimetro ")
+    function crearContador() {
+        const m = new Map();
+        const clave = t => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+        return {
+            sumar(nombre, prestamos = 1, piezas = 0) {
+                const limpio = String(nombre).replace(/\s+/g, ' ').trim();
+                if (!limpio) return;
+                const k = clave(limpio);
+                const e = m.get(k) || { nombre: limpio, prestamos: 0, piezas: 0 };
+                e.prestamos += prestamos; e.piezas += piezas;
+                m.set(k, e);
+            },
+            lista() { return [...m.values()].sort((a, b) => b.prestamos - a.prestamos || a.nombre.localeCompare(b.nombre)); }
+        };
+    }
+
+    function calcularReporte(registros) {
+        const equipos = crearContador(), puntas = crearContador(), herramientas = crearContador();
+        const carreras = crearContador(), materias = crearContador();
+        const boletas = new Set(), dias = new Set();
+        let personas = 0;
+
+        registros.forEach(r => {
+            boletas.add((r.boleta || '').trim());
+            dias.add(r.fecha);
+            personas += parseInt(r.integrantes) || 1;
+            carreras.sumar(r.carrera || 'Sin carrera');
+            materias.sumar(r.materia || 'Sin materia');
+            (r.equipos || '').split('\n').forEach(e => equipos.sumar(e));
+            (r.herramienta || '').split('\n').forEach(h => herramientas.sumar(h));
+            (r.puntas || '').split('\n').forEach(linea => {
+                const m = linea.match(/^(.*?):\s*(\d+)\s*$/);
+                const tipo = (m ? m[1] : linea).replace(/^Puntas\s+/i, '');
+                puntas.sumar(tipo, 1, m ? parseInt(m[2]) : 1);
+            });
+        });
+
+        return {
+            totales: { registros: registros.length, alumnos: boletas.size, personas, dias: dias.size },
+            equipos: equipos.lista(), puntas: puntas.lista(), herramientas: herramientas.lista(),
+            carreras: carreras.lista(), materias: materias.lista()
+        };
+    }
+
+    function tablaReporte(titulo, filas, conPiezas = false) {
+        const cuerpo = filas.length
+            ? filas.map(f => `<tr><td>${esc(f.nombre)}</td><td class="num">${f.prestamos}</td>${conPiezas ? `<td class="num">${f.piezas}</td>` : ''}</tr>`).join('')
+            : `<tr><td colspan="3" style="color:#94a3b8">Sin datos</td></tr>`;
+        return `<h4>${titulo}</h4><table>
+            <tr><th>Nombre</th><th class="num">Veces</th>${conPiezas ? '<th class="num">Piezas</th>' : ''}</tr>${cuerpo}</table>`;
+    }
+
+    async function abrirReporte() {
+        const fechas = await pedirRango('Reporte de uso de material', 'Generar', '#1e40af');
+        if (!fechas) return;
+
+        Swal.fire({ title: 'Generando reporte…', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+
+        const { data, error } = await traerTodo(() => db.from('registros')
+            .select('id, fecha, carrera, materia, boleta, integrantes, equipos, puntas, herramienta')
+            .gte('fecha', fechas.inicio)
+            .lte('fecha', fechas.fin)
+            .order('fecha', { ascending: true })
+            .order('id', { ascending: true }));
+
+        if (error) { Swal.fire('Error', error.message, 'error'); return; }
+        if (!data.length) { Swal.fire('Sin datos', 'No hay registros en ese rango de fechas.', 'info'); return; }
+
+        const rep = calcularReporte(data);
+        const t = rep.totales;
+
+        const { isConfirmed } = await Swal.fire({
+            title: 'Reporte de uso',
+            width: 760,
+            html: `<div class="rep">
+                <div style="color:#64748b; margin-bottom:10px;">Del <b>${fechas.inicio}</b> al <b>${fechas.fin}</b></div>
+                <div class="rep-totales">
+                    <div class="rep-total"><b>${t.registros}</b><span>Registros</span></div>
+                    <div class="rep-total"><b>${t.alumnos}</b><span>Alumnos distintos</span></div>
+                    <div class="rep-total"><b>${t.personas}</b><span>Personas (con integrantes)</span></div>
+                    <div class="rep-total"><b>${t.dias}</b><span>Días con actividad</span></div>
+                </div>
+                ${tablaReporte('Equipos', rep.equipos)}
+                ${tablaReporte('Puntas', rep.puntas, true)}
+                ${tablaReporte('Herramientas adicionales', rep.herramientas)}
+                ${tablaReporte('Registros por carrera', rep.carreras)}
+                ${tablaReporte('Registros por materia', rep.materias)}
+                <div class="nota">"Veces" = número de registros en los que se prestó. "Piezas" = suma de las cantidades de puntas.</div>
+            </div>`,
+            confirmButtonText: '📥 Descargar Excel',
+            confirmButtonColor: '#166534',
+            showCancelButton: true,
+            cancelButtonText: 'Cerrar'
+        });
+
+        if (!isConfirmed) return;
+
+        const libro = XLSX.utils.book_new();
+        const hoja = (filas, cols) => { const h = XLSX.utils.json_to_sheet(filas); h['!cols'] = cols.map(w => ({ wch: w })); return h; };
+
+        XLSX.utils.book_append_sheet(libro, hoja([
+            { 'Concepto': 'Periodo', 'Valor': `${fechas.inicio} a ${fechas.fin}` },
+            { 'Concepto': 'Registros', 'Valor': t.registros },
+            { 'Concepto': 'Alumnos distintos (por boleta)', 'Valor': t.alumnos },
+            { 'Concepto': 'Personas (sumando integrantes)', 'Valor': t.personas },
+            { 'Concepto': 'Días con actividad', 'Valor': t.dias }
+        ], [34, 26]), 'Resumen');
+        XLSX.utils.book_append_sheet(libro, hoja(rep.equipos.map(f => ({ 'Equipo': f.nombre, 'Veces prestado': f.prestamos })), [30, 16]), 'Equipos');
+        XLSX.utils.book_append_sheet(libro, hoja(rep.puntas.map(f => ({ 'Puntas': f.nombre, 'Veces prestadas': f.prestamos, 'Piezas totales': f.piezas })), [24, 16, 16]), 'Puntas');
+        XLSX.utils.book_append_sheet(libro, hoja(rep.herramientas.map(f => ({ 'Herramienta': f.nombre, 'Veces prestada': f.prestamos })), [34, 16]), 'Herramientas');
+        XLSX.utils.book_append_sheet(libro, hoja(rep.carreras.map(f => ({ 'Carrera': f.nombre, 'Registros': f.prestamos })), [24, 12]), 'Por carrera');
+        XLSX.utils.book_append_sheet(libro, hoja(rep.materias.map(f => ({ 'Materia': f.nombre, 'Registros': f.prestamos })), [40, 12]), 'Por materia');
+
+        XLSX.writeFile(libro, `reporte_uso_${fechas.inicio}_${fechas.fin}.xlsx`);
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────────

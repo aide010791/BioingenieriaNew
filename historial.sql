@@ -80,9 +80,9 @@ create trigger trg_historial_registros
     for each row execute function public.registrar_historial();
 
 
--- ── Ajuste de seguridad: el ID que manda el alumno debe ser de 3 letras ─────
+-- ── Ajuste de seguridad: el ID que manda el alumno debe ser de 3 o 4 letras 
 -- (evita que alguien inserte un ID con código que se ejecute en el panel)
 drop policy if exists "alumnos_insertan" on public.registros;
 create policy "alumnos_insertan" on public.registros
     for insert to anon
-    with check (estado = 'pendiente' and id ~ '^[A-Z]{3}$');
+    with check (estado = 'pendiente' and id ~ '^[A-Z]{3,4}$');
