@@ -609,6 +609,7 @@
                         <th>Fecha</th>
                         <th>Nombre</th>
                         <th>Boleta</th>
+                        <th>Carrera</th>
                         <th>Materia</th>
                         <th>Profesor</th>
                         <th>Piezas</th>
@@ -619,7 +620,7 @@
                     </tr>
                 </thead>
                 <tbody id="imp-body">
-                    <tr><td colspan="10"><div class="sin-registros">Elige un periodo y presiona Buscar.</div></td></tr>
+                    <tr><td colspan="11"><div class="sin-registros">Elige un periodo y presiona Buscar.</div></td></tr>
                 </tbody>
             </table>
         </div>
@@ -1335,7 +1336,7 @@
         if (inicio > fin)    { Swal.fire('Fechas invertidas', 'La fecha de inicio no puede ser mayor a la de fin.', 'warning'); return; }
 
         const body = document.getElementById('imp-body');
-        body.innerHTML = '<tr><td colspan="10"><div class="sin-registros">Cargando…</div></td></tr>';
+        body.innerHTML = '<tr><td colspan="11"><div class="sin-registros">Cargando…</div></td></tr>';
 
         const { data, error } = await traerTodo(() => db.from('impresiones')
             .select('*')
@@ -1346,7 +1347,7 @@
             .order('id', { ascending: false }));
 
         if (error) {
-            body.innerHTML = `<tr><td colspan="10"><div class="sin-registros">No se pudo cargar: ${esc(error.message)}</div></td></tr>`;
+            body.innerHTML = `<tr><td colspan="11"><div class="sin-registros">No se pudo cargar: ${esc(error.message)}</div></td></tr>`;
             return;
         }
         impresionesActuales = data;
@@ -1374,7 +1375,7 @@
 
         const body = document.getElementById('imp-body');
         if (!data.length) {
-            body.innerHTML = '<tr><td colspan="10"><div class="sin-registros">No hay impresiones registradas en ese periodo.</div></td></tr>';
+            body.innerHTML = '<tr><td colspan="11"><div class="sin-registros">No hay impresiones registradas en ese periodo.</div></td></tr>';
             return;
         }
         body.innerHTML = data.map(r => `
@@ -1382,6 +1383,7 @@
                 <td>${esc(r.fecha)}</td>
                 <td><strong>${esc(r.nombre)}</strong></td>
                 <td>${esc(r.boleta)}</td>
+                <td>${esc(r.carrera) || '—'}</td>
                 <td>${esc(r.materia)}</td>
                 <td>${esc(r.profesor)}</td>
                 <td style="text-align:center; font-weight:600;">${esc(r.piezas)}</td>
@@ -1419,6 +1421,7 @@
             'Hora de registro': formatearHora(r.created_at),
             'Nombre':          r.nombre,
             'Boleta':          r.boleta,
+            'Carrera':         r.carrera || '',
             'Materia':         r.materia,
             'Profesor':        r.profesor,
             'Piezas':          r.piezas,
@@ -1429,7 +1432,7 @@
         }));
         const libro = XLSX.utils.book_new();
         const hoja = XLSX.utils.json_to_sheet(filas);
-        hoja['!cols'] = [12, 14, 28, 14, 30, 28, 8, 12, 14, 11, 10].map(w => ({ wch: w }));
+        hoja['!cols'] = [12, 14, 28, 14, 14, 30, 28, 8, 12, 14, 11, 10].map(w => ({ wch: w }));
         XLSX.utils.book_append_sheet(libro, hoja, 'Impresiones');
 
         const porTipo = {};
@@ -1448,6 +1451,19 @@
         const hojaRes = XLSX.utils.json_to_sheet([...resumen, total]);
         hojaRes['!cols'] = [14, 10, 10, 10, 12].map(w => ({ wch: w }));
         XLSX.utils.book_append_sheet(libro, hojaRes, 'Resumen');
+
+        const porCarrera = {};
+        impresionesActuales.forEach(r => {
+            const k = r.carrera || 'Sin carrera';
+            const c = porCarrera[k] || (porCarrera[k] = { registros: 0, piezas: 0, min: 0, gramos: 0 });
+            c.registros++; c.piezas += r.piezas; c.min += r.tiempo_min; c.gramos += Number(r.gramos);
+        });
+        const hojaCar = XLSX.utils.json_to_sheet(Object.entries(porCarrera)
+            .sort((a, b) => b[1].gramos - a[1].gramos)
+            .map(([k, v]) => ({ 'Carrera': k, 'Registros': v.registros, 'Piezas': v.piezas,
+                'Horas': Math.round(v.min / 6) / 10, 'Gramos': Math.round(v.gramos * 10) / 10 })));
+        hojaCar['!cols'] = [16, 10, 10, 10, 12].map(w => ({ wch: w }));
+        XLSX.utils.book_append_sheet(libro, hojaCar, 'Por carrera');
 
         XLSX.writeFile(libro, `impresion3d_${inicio}_${fin}.xlsx`);
     }
