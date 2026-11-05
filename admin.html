@@ -144,6 +144,35 @@
         .stat-entregado .stat-num  { color: #16a34a; }
         .stat-parcial .stat-num    { color: #ea580c; }
 
+        /* ── Pestañas ── */
+        .tabs {
+            background: white;
+            border-bottom: 1px solid #e2e8f0;
+            padding: 0 28px;
+            display: flex;
+            gap: 4px;
+        }
+        .tab {
+            background: none;
+            border: none;
+            border-bottom: 3px solid transparent;
+            padding: 14px 16px 11px;
+            font-family: 'Inter', sans-serif;
+            font-size: 14px;
+            font-weight: 600;
+            color: #64748b;
+            cursor: pointer;
+        }
+        .tab:hover { color: #1e293b; }
+        .tab.activa { color: #1e293b; border-bottom-color: #1e293b; }
+        .vista[hidden] { display: none; }
+
+        .stat-imp .stat-num { color: #1e40af; }
+        .imp-desglose { padding: 0 28px; margin-top: 14px; font-size: 13px; color: #475569; display: flex; gap: 8px; flex-wrap: wrap; }
+        .imp-chip { background: #eff6ff; color: #1e40af; border-radius: 999px; padding: 4px 12px; font-weight: 600; }
+        #tabla-impresiones tbody tr { cursor: default; }
+        .btn-borrar-imp { background: #fee2e2; color: #991b1b; border: none; border-radius: 6px; padding: 6px 10px; cursor: pointer; font-size: 13px; }
+
         /* ── Tabla ── */
         .tabla-wrap {
             padding: 24px 28px;
@@ -498,6 +527,12 @@
         </div>
     </div>
 
+    <div class="tabs" role="tablist">
+        <button class="tab activa" data-vista="prestamos" onclick="cambiarVista('prestamos')">📋 Préstamos de material</button>
+        <button class="tab" data-vista="impresion" onclick="cambiarVista('impresion')">🖨️ Impresión 3D</button>
+    </div>
+
+    <div class="vista" id="vista-prestamos">
     <div class="controles">
         <label for="filtro-fecha">Fecha:</label>
         <input type="date" id="filtro-fecha">
@@ -543,6 +578,51 @@
                 <tr><td colspan="10"><div class="sin-registros">Selecciona una fecha para ver los registros.</div></td></tr>
             </tbody>
         </table>
+    </div>
+    </div>
+
+    <!-- ── Vista: Impresión 3D ── -->
+    <div class="vista" id="vista-impresion" hidden>
+        <div class="controles">
+            <label for="imp-inicio">Del:</label>
+            <input type="date" id="imp-inicio">
+            <label for="imp-fin">al:</label>
+            <input type="date" id="imp-fin">
+            <button class="btn-ctrl btn-primary" onclick="cargarImpresiones()">Buscar</button>
+            <button class="btn-ctrl btn-secondary" onclick="impresionesEsteMes()">Este mes</button>
+            <button class="btn-ctrl" onclick="exportarImpresiones()" style="background:#166534; color:white; margin-left:4px;">📥 Descargar Excel</button>
+
+            <div class="stats">
+                <div class="stat stat-imp"><div class="stat-num" id="imp-registros">—</div><div class="stat-label">Registros</div></div>
+                <div class="stat stat-imp"><div class="stat-num" id="imp-piezas">—</div><div class="stat-label">Piezas</div></div>
+                <div class="stat stat-imp"><div class="stat-num" id="imp-horas">—</div><div class="stat-label">Horas</div></div>
+                <div class="stat stat-imp"><div class="stat-num" id="imp-gramos">—</div><div class="stat-label">Gramos</div></div>
+            </div>
+        </div>
+
+        <div class="imp-desglose" id="imp-desglose"></div>
+
+        <div class="tabla-wrap">
+            <table id="tabla-impresiones">
+                <thead>
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Nombre</th>
+                        <th>Boleta</th>
+                        <th>Materia</th>
+                        <th>Profesor</th>
+                        <th>Piezas</th>
+                        <th>Tiempo</th>
+                        <th>Filamento</th>
+                        <th>Gramos</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody id="imp-body">
+                    <tr><td colspan="10"><div class="sin-registros">Elige un periodo y presiona Buscar.</div></td></tr>
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>
 
@@ -1223,6 +1303,153 @@
         XLSX.utils.book_append_sheet(libro, hoja(rep.materias.map(f => ({ 'Materia': f.nombre, 'Registros': f.prestamos })), [40, 12]), 'Por materia');
 
         XLSX.writeFile(libro, `reporte_uso_${fechas.inicio}_${fechas.fin}.xlsx`);
+    }
+
+    // ── Impresión 3D (tabla "impresiones", formulario del repo Impresora3D) ────
+
+    let impresionesActuales = [];
+
+    function cambiarVista(vista) {
+        document.querySelectorAll('.tab').forEach(t => t.classList.toggle('activa', t.dataset.vista === vista));
+        document.getElementById('vista-prestamos').hidden = vista !== 'prestamos';
+        document.getElementById('vista-impresion').hidden = vista !== 'impresion';
+        if (vista === 'impresion' && !document.getElementById('imp-inicio').value) impresionesEsteMes();
+    }
+
+    function impresionesEsteMes() {
+        const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' });
+        document.getElementById('imp-inicio').value = hoy.slice(0, 8) + '01';
+        document.getElementById('imp-fin').value = hoy;
+        cargarImpresiones();
+    }
+
+    function formatearTiempo(min) {
+        const h = Math.floor(min / 60), m = min % 60;
+        return h ? `${h} h ${m} min` : `${m} min`;
+    }
+
+    async function cargarImpresiones() {
+        const inicio = document.getElementById('imp-inicio').value;
+        const fin    = document.getElementById('imp-fin').value;
+        if (!inicio || !fin) { Swal.fire('Elige las fechas', 'Selecciona fecha de inicio y fin.', 'info'); return; }
+        if (inicio > fin)    { Swal.fire('Fechas invertidas', 'La fecha de inicio no puede ser mayor a la de fin.', 'warning'); return; }
+
+        const body = document.getElementById('imp-body');
+        body.innerHTML = '<tr><td colspan="10"><div class="sin-registros">Cargando…</div></td></tr>';
+
+        const { data, error } = await traerTodo(() => db.from('impresiones')
+            .select('*')
+            .gte('fecha', inicio)
+            .lte('fecha', fin)
+            .order('fecha', { ascending: false })
+            .order('created_at', { ascending: false })
+            .order('id', { ascending: false }));
+
+        if (error) {
+            body.innerHTML = `<tr><td colspan="10"><div class="sin-registros">No se pudo cargar: ${esc(error.message)}</div></td></tr>`;
+            return;
+        }
+        impresionesActuales = data;
+        renderImpresiones();
+    }
+
+    function renderImpresiones() {
+        const data = impresionesActuales;
+        const tot = data.reduce((a, r) => ({
+            piezas: a.piezas + (r.piezas || 0),
+            min:    a.min + (r.tiempo_min || 0),
+            gramos: a.gramos + Number(r.gramos || 0)
+        }), { piezas: 0, min: 0, gramos: 0 });
+
+        document.getElementById('imp-registros').textContent = data.length;
+        document.getElementById('imp-piezas').textContent = tot.piezas;
+        document.getElementById('imp-horas').textContent = (tot.min / 60).toFixed(1);
+        document.getElementById('imp-gramos').textContent = Math.round(tot.gramos).toLocaleString('es-MX');
+
+        const porTipo = {};
+        data.forEach(r => { porTipo[r.filamento] = (porTipo[r.filamento] || 0) + Number(r.gramos || 0); });
+        document.getElementById('imp-desglose').innerHTML = Object.entries(porTipo)
+            .sort((a, b) => b[1] - a[1])
+            .map(([t, g]) => `<span class="imp-chip">${esc(t)}: ${Math.round(g).toLocaleString('es-MX')} g</span>`).join('');
+
+        const body = document.getElementById('imp-body');
+        if (!data.length) {
+            body.innerHTML = '<tr><td colspan="10"><div class="sin-registros">No hay impresiones registradas en ese periodo.</div></td></tr>';
+            return;
+        }
+        body.innerHTML = data.map(r => `
+            <tr>
+                <td>${esc(r.fecha)}</td>
+                <td><strong>${esc(r.nombre)}</strong></td>
+                <td>${esc(r.boleta)}</td>
+                <td>${esc(r.materia)}</td>
+                <td>${esc(r.profesor)}</td>
+                <td style="text-align:center; font-weight:600;">${esc(r.piezas)}</td>
+                <td>${formatearTiempo(r.tiempo_min)}</td>
+                <td>${esc(r.filamento)}</td>
+                <td style="text-align:right; font-weight:600;">${esc(r.gramos)} g</td>
+                <td><button class="btn-borrar-imp" title="Eliminar registro" onclick="eliminarImpresion(${Number(r.id)})">🗑</button></td>
+            </tr>`).join('');
+    }
+
+    async function eliminarImpresion(id) {
+        const r = impresionesActuales.find(x => x.id === id);
+        if (!r) return;
+        const { isConfirmed } = await Swal.fire({
+            title: '¿Eliminar registro?',
+            html: `Impresión de <strong>${esc(r.nombre)}</strong> del ${esc(r.fecha)}.<br>Esta acción no se puede deshacer.`,
+            icon: 'warning', showCancelButton: true,
+            confirmButtonText: 'Sí, eliminar', cancelButtonText: 'Cancelar', confirmButtonColor: '#dc2626'
+        });
+        if (!isConfirmed) return;
+        const { error } = await db.from('impresiones').delete().eq('id', id);
+        if (error) { Swal.fire('Error', error.message, 'error'); return; }
+        impresionesActuales = impresionesActuales.filter(x => x.id !== id);
+        renderImpresiones();
+        Swal.fire({ toast: true, position: 'top', icon: 'success', title: 'Registro eliminado', showConfirmButton: false, timer: 1800 });
+    }
+
+    function exportarImpresiones() {
+        const inicio = document.getElementById('imp-inicio').value;
+        const fin    = document.getElementById('imp-fin').value;
+        if (!impresionesActuales.length) { Swal.fire('Sin datos', 'Primero busca un periodo con registros.', 'info'); return; }
+
+        const filas = [...impresionesActuales].reverse().map(r => ({
+            'Fecha':           r.fecha,
+            'Hora de registro': formatearHora(r.created_at),
+            'Nombre':          r.nombre,
+            'Boleta':          r.boleta,
+            'Materia':         r.materia,
+            'Profesor':        r.profesor,
+            'Piezas':          r.piezas,
+            'Tiempo (min)':    r.tiempo_min,
+            'Tiempo (horas)':  Math.round(r.tiempo_min / 6) / 10,
+            'Filamento':       r.filamento,
+            'Gramos':          Number(r.gramos)
+        }));
+        const libro = XLSX.utils.book_new();
+        const hoja = XLSX.utils.json_to_sheet(filas);
+        hoja['!cols'] = [12, 14, 28, 14, 30, 28, 8, 12, 14, 11, 10].map(w => ({ wch: w }));
+        XLSX.utils.book_append_sheet(libro, hoja, 'Impresiones');
+
+        const porTipo = {};
+        impresionesActuales.forEach(r => {
+            const t = porTipo[r.filamento] || (porTipo[r.filamento] = { registros: 0, piezas: 0, min: 0, gramos: 0 });
+            t.registros++; t.piezas += r.piezas; t.min += r.tiempo_min; t.gramos += Number(r.gramos);
+        });
+        const resumen = Object.entries(porTipo).map(([t, v]) => ({
+            'Filamento': t, 'Registros': v.registros, 'Piezas': v.piezas,
+            'Horas': Math.round(v.min / 6) / 10, 'Gramos': Math.round(v.gramos * 10) / 10
+        }));
+        const tt = Object.values(porTipo).reduce((a, v) => ({ registros: a.registros + v.registros, piezas: a.piezas + v.piezas, min: a.min + v.min, gramos: a.gramos + v.gramos }),
+            { registros: 0, piezas: 0, min: 0, gramos: 0 });
+        const total = { 'Filamento': 'TOTAL', 'Registros': tt.registros, 'Piezas': tt.piezas,
+            'Horas': Math.round(tt.min / 6) / 10, 'Gramos': Math.round(tt.gramos * 10) / 10 };
+        const hojaRes = XLSX.utils.json_to_sheet([...resumen, total]);
+        hojaRes['!cols'] = [14, 10, 10, 10, 12].map(w => ({ wch: w }));
+        XLSX.utils.book_append_sheet(libro, hojaRes, 'Resumen');
+
+        XLSX.writeFile(libro, `impresion3d_${inicio}_${fin}.xlsx`);
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────────

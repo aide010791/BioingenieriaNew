@@ -218,3 +218,14 @@ o borra el usuario y créalo de nuevo con otra contraseña.
   el campo Profesor sugiere primero a quienes la imparten (aunque esté vacío).
 - No consulta la base de datos (no expone datos de alumnos).
 - **Cada semestre**: regenerar `js/catalogo.js` con el PDF de horarios nuevo.
+
+## Impresión 3D (pestaña "🖨️ Impresión 3D" en el panel)
+
+- Formulario en el repo **Impresora3D** (impresión con filamento); guarda en la tabla
+  `impresiones` de este mismo proyecto Supabase (SQL en `Impresora3D/impresiones.sql`).
+- Campos: fecha, nombre, boleta, materia, profesor, piezas, `tiempo_min` (horas+minutos),
+  `filamento` (PLA | PETG | ABS | TPU | Otro) y `gramos`.
+- Alumnos solo pueden **registrar**; el administrador ve por rango de fechas, ve totales
+  (registros, piezas, horas, gramos y gramos por tipo), elimina y descarga Excel
+  (hojas "Impresiones" y "Resumen").
+
