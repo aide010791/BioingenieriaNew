@@ -34,7 +34,7 @@ ValeBioingenieriaLetras/
 CREATE TABLE registros (
   id               TEXT PRIMARY KEY,       -- ID interno de 3 letras (ej: "ABC"), generado automáticamente
   fecha            DATE NOT NULL,           -- Fecha del registro (llenada por el alumno)
-  carrera          TEXT,                    -- Biónica | Mecatrónica | Telemática | ISISA
+  carrera          TEXT,                    -- Biónica | Mecatrónica | Telemática | ISISA | Energía
   nombre           TEXT NOT NULL,
   boleta           TEXT NOT NULL,           -- Usado para buscar/modificar registros
   materia          TEXT NOT NULL,           -- Texto libre
@@ -207,3 +207,14 @@ o borra el usuario y créalo de nuevo con otra contraseña.
 - Se generan con 3 letras; si el ID ya existe en la base de datos (error 23505), el formulario
   genera otro y reintenta automáticamente. Después de 8 choques usa 4 letras.
 - La regla RLS acepta IDs de 3 o 4 letras mayúsculas (`^[A-Z]{3,4}$`).
+
+## Autocompletado de Materia y Profesor
+
+- `js/catalogo.js`: catálogo generado del PDF de horarios UPIITA (ciclo 2027/1): 246 materias
+  (con la carrera según la letra del grupo: B=Biónica, M=Mecatrónica, T=Telemática, E=Energía,
+  S=ISISA) y 220 profesores (nombre en orden "Nombre Apellidos"; se busca por cualquier palabra).
+- `js/autocompletar.js`: muestra hasta 6 sugerencias mientras el alumno escribe. El campo sigue
+  aceptando texto libre. Las materias de la carrera elegida salen primero; al elegir una materia,
+  el campo Profesor sugiere primero a quienes la imparten (aunque esté vacío).
+- No consulta la base de datos (no expone datos de alumnos).
+- **Cada semestre**: regenerar `js/catalogo.js` con el PDF de horarios nuevo.

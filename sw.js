@@ -1,10 +1,12 @@
-const CACHE_NAME = 'lab-bioing-v2';
+const CACHE_NAME = 'lab-bioing-v3';
 
 // Archivos que se guardan en el celular la primera vez
 const ARCHIVOS_CACHE = [
     '/BioingenieriaNew/',
     '/BioingenieriaNew/index.html',
     '/BioingenieriaNew/js/app.js',
+    '/BioingenieriaNew/js/catalogo.js',
+    '/BioingenieriaNew/js/autocompletar.js',
     '/BioingenieriaNew/css/estilos.css',
     '/BioingenieriaNew/css/IPN.png',
     '/BioingenieriaNew/css/UPIITA.png'
