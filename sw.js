@@ -1,4 +1,4 @@
-const CACHE_NAME = 'lab-bioing-v1';
+const CACHE_NAME = 'lab-bioing-v2';
 
 // Archivos que se guardan en el celular la primera vez
 const ARCHIVOS_CACHE = [

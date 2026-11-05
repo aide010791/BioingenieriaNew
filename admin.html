@@ -441,8 +441,9 @@
         <img src="css/IPN.png" alt="IPN">
         <h2>Panel de Administrador</h2>
         <p>Lab Bioingeniería — UPIITA</p>
+        <input type="email" id="email-input" placeholder="Correo" autocomplete="username">
         <input type="password" id="password-input" placeholder="Contraseña" autocomplete="current-password">
-        <button class="btn btn-primary" style="width:100%" onclick="verificarPassword()">Entrar</button>
+        <button class="btn btn-primary" style="width:100%" id="btn-entrar" onclick="iniciarSesion()">Entrar</button>
     </div>
 </div>
 
@@ -454,8 +455,9 @@
             <img src="css/IPN.png" alt="IPN">
         </div>
         <h1>Panel de Administrador — Lab Bioingeniería</h1>
-        <div class="header-right">
+        <div class="header-right" style="display:flex; align-items:center; gap:12px;">
             <img src="css/UPIITA.png" alt="UPIITA" style="height:36px; filter:brightness(0) invert(1);">
+            <button class="btn-ctrl" onclick="cerrarSesion()" style="background:rgba(255,255,255,0.15); color:white; border:1px solid rgba(255,255,255,0.3);">Cerrar sesión</button>
         </div>
     </div>
 
@@ -563,37 +565,61 @@
     const SUPABASE_KEY = 'sb_publishable_7-8BuHvJF63KH6T2xavAEA_euEHKqC-';
     const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    // Hash SHA-256 de la contraseña (nunca guardes la contraseña en texto plano)
-    // Contraseña actual: labbioing2024
-    // Para cambiarla: genera un nuevo hash en https://emn178.github.io/online-tools/sha256.html
-    const PASSWORD_HASH = 'ef449652ef4a87a5fad1b8f72a791e371ee4722bd7540dc791ae1ac36af39dfc';
+    // El acceso se controla con Supabase Auth + reglas RLS en la base de datos
+    // (ver seguridad.sql). Aquí NO hay contraseñas guardadas.
 
     let registroActivo = null;
 
     // ── Login ──────────────────────────────────────────────────────────────────
 
-    async function hashear(texto) {
-        const encoder = new TextEncoder();
-        const data = encoder.encode(texto);
-        const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-        return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2,'0')).join('');
+    function mostrarPanel() {
+        document.getElementById('login-screen').style.display = 'none';
+        document.getElementById('panel').style.display = 'block';
+        cargarHoy();
     }
 
-    async function verificarPassword() {
-        const input = document.getElementById('password-input').value;
-        const hash = await hashear(input);
-        if (hash === PASSWORD_HASH) {
-            document.getElementById('login-screen').style.display = 'none';
-            document.getElementById('panel').style.display = 'block';
-            cargarHoy();
-        } else {
-            Swal.fire({ toast: true, position: 'top', icon: 'error',
-                title: 'Contraseña incorrecta', showConfirmButton: false, timer: 2000 });
+    function mostrarLogin() {
+        document.getElementById('panel').style.display = 'none';
+        document.getElementById('login-screen').style.display = 'flex';
+    }
+
+    async function iniciarSesion() {
+        const email    = document.getElementById('email-input').value.trim();
+        const password = document.getElementById('password-input').value;
+        if (!email || !password) {
+            Swal.fire({ toast: true, position: 'top', icon: 'warning',
+                title: 'Escribe correo y contraseña', showConfirmButton: false, timer: 2000 });
+            return;
         }
+
+        const btn = document.getElementById('btn-entrar');
+        btn.disabled = true;
+        const { error } = await db.auth.signInWithPassword({ email, password });
+        btn.disabled = false;
+
+        if (error) {
+            Swal.fire({ toast: true, position: 'top', icon: 'error',
+                title: 'Correo o contraseña incorrectos', showConfirmButton: false, timer: 2500 });
+            return;
+        }
+        document.getElementById('password-input').value = '';
+        mostrarPanel();
     }
 
-    document.getElementById('password-input').addEventListener('keydown', e => {
-        if (e.key === 'Enter') verificarPassword();
+    async function cerrarSesion() {
+        await db.auth.signOut();
+        mostrarLogin();
+    }
+
+    ['email-input', 'password-input'].forEach(idInput =>
+        document.getElementById(idInput).addEventListener('keydown', e => {
+            if (e.key === 'Enter') iniciarSesion();
+        })
+    );
+
+    // Si ya había una sesión abierta en este navegador, entrar directo
+    db.auth.getSession().then(({ data }) => {
+        if (data.session) mostrarPanel();
     });
 
     // ── Cargar registros ───────────────────────────────────────────────────────

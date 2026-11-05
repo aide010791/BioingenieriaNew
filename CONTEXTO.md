@@ -103,11 +103,11 @@ ALTER TABLE registros ADD COLUMN carrera TEXT;
 ## Panel de administrador (admin.html)
 
 ### Acceso
-- Protegido por contraseña hasheada con **SHA-256**
-- Hash actual (contraseña: `labbioing2024`):
-  `ef449652ef4a87a5fad1b8f72a791e371ee4722bd7540dc791ae1ac36af39dfc`
-- Para cambiar la contraseña: generar nuevo hash en https://emn178.github.io/online-tools/sha256.html
-  y reemplazar `PASSWORD_HASH` en el script de `admin.html`
+- Login con **correo y contraseña de Supabase Auth** (no hay contraseñas en el código).
+- Solo los correos que estén en la tabla `administradores` pueden ver, editar y borrar registros
+  (reglas RLS definidas en `seguridad.sql`).
+- Para agregar otro encargado: crear el usuario en Supabase → Authentication → Users → Add user,
+  y luego en SQL Editor: `insert into administradores (email) values ('correo@ejemplo.com');`
 
 ### Funcionalidades
 - **Filtrar por fecha** con botón "Hoy" (usa zona horaria México)
@@ -152,7 +152,7 @@ ALTER TABLE registros ADD COLUMN carrera TEXT;
 | Ventana de 3 horas para modificar | Evita modificaciones tardías, pero el admin puede extender |
 | Materia como texto libre | Hay demasiadas materias y alumnos de otras carreras |
 | ID de 3 letras solo interno | El alumno no lo necesita, simplifica la UX |
-| Contraseña hasheada | Evita que el código fuente exponga la contraseña |
+| Supabase Auth + RLS | La seguridad la aplica la base de datos, no el navegador; el repo puede ser público |
 | Zona horaria Mexico_City en todo | Evita bug donde después de las 6pm el sistema cree que es mañana |
 | font-size: 16px en inputs | iOS Safari hace zoom automático si es menor a 16px |
 | viewport-fit=cover + safe-area-inset | Soporte para iPhone con notch (X en adelante) |
@@ -169,7 +169,13 @@ ALTER TABLE registros ADD COLUMN carrera TEXT;
 
 ## Cómo cambiar la contraseña del admin
 
-1. Ve a https://emn178.github.io/online-tools/sha256.html
-2. Escribe tu nueva contraseña
-3. Copia el hash generado
-4. En `admin.html`, busca la línea `const PASSWORD_HASH = '...'` y reemplaza el valor
+En Supabase → Authentication → Users → (tu usuario) → "Send password recovery",
+o borra el usuario y créalo de nuevo con otra contraseña.
+
+## Seguridad de la base de datos (RLS)
+
+- Alumnos (sin sesión): solo pueden **insertar** registros nuevos con estado `pendiente`.
+- Para buscar/modificar su registro usan las funciones `buscar_mi_registro(boleta)` y
+  `modificar_mi_registro(id, boleta_original, datos)`, que solo funcionan con el registro de hoy
+  y dentro de las 3 horas. No pueden leer la tabla completa ni borrar nada.
+- Administradores (con sesión y correo en `administradores`): acceso total.
