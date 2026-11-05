@@ -368,6 +368,29 @@
         .detalle-key { color: #64748b; font-weight: 500; flex-shrink: 0; }
         .detalle-val { color: #1e293b; font-weight: 600; text-align: right; white-space: pre-line; }
 
+        /* ── Historial de cambios ── */
+        .badge-mod {
+            display: inline-block;
+            margin-left: 6px;
+            font-size: 12px;
+            cursor: help;
+        }
+        .hist-item {
+            border-left: 3px solid #cbd5e1;
+            padding: 6px 0 8px 12px;
+            margin-bottom: 10px;
+        }
+        .hist-item.alumno     { border-left-color: #3b82f6; }
+        .hist-item.admin      { border-left-color: #f59e0b; }
+        .hist-item.eliminado  { border-left-color: #ef4444; }
+        .hist-cabecera { font-size: 12px; color: #64748b; margin-bottom: 4px; }
+        .hist-cabecera strong { color: #1e293b; }
+        .hist-cambio { font-size: 13px; padding: 2px 0; line-height: 1.45; }
+        .hist-campo  { color: #64748b; font-weight: 600; }
+        .hist-antes  { color: #b91c1c; text-decoration: line-through; white-space: pre-line; }
+        .hist-despues{ color: #15803d; font-weight: 600; white-space: pre-line; }
+        .hist-vacio  { font-size: 13px; color: #94a3b8; }
+
         /* ── Panel editar en detalle ── */
         .panel-editar { display: none; }
         .panel-editar.visible { display: block; }
@@ -529,6 +552,10 @@
                 <div class="detalle-seccion-titulo">Material registrado</div>
                 <div id="detalle-material"></div>
             </div>
+            <div class="detalle-seccion">
+                <div class="detalle-seccion-titulo">Historial de cambios</div>
+                <div id="detalle-historial"><div class="hist-vacio">Cargando…</div></div>
+            </div>
         </div>
 
         <!-- Vista editar -->
@@ -640,8 +667,18 @@
 
         if (error) { Swal.fire('Error', error.message, 'error'); return; }
 
+        // Registros de este día que han sido modificados (para la marca ✏️)
+        let modificados = new Set();
+        if (data && data.length) {
+            const { data: hist } = await db.from('historial_registros')
+                .select('registro_id')
+                .eq('accion', 'modificado')
+                .in('registro_id', data.map(r => r.id));
+            modificados = new Set((hist || []).map(h => h.registro_id));
+        }
+
         actualizarStats(data || []);
-        renderizarTabla(data || []);
+        renderizarTabla(data || [], modificados);
     }
 
     function actualizarStats(registros) {
@@ -650,7 +687,7 @@
         document.getElementById('cnt-entregado').textContent  = registros.filter(r => r.estado === 'entregado').length;
     }
 
-    function renderizarTabla(registros) {
+    function renderizarTabla(registros, modificados = new Set()) {
         const tbody = document.getElementById('tabla-body');
 
         if (!registros.length) {
@@ -661,13 +698,13 @@
         tbody.innerHTML = registros.map(r => `
             <tr class="${r.estado}" id="fila-${r.id}">
                 <td>${formatearHora(r.created_at)}</td>
-                <td>${r.carrera || '—'}</td>
-                <td><strong>${r.nombre || ''}</strong></td>
-                <td>${r.boleta || ''}</td>
-                <td>${r.materia || ''}</td>
-                <td>${r.profesor || ''}</td>
-                <td>${r.mesa_de_trabajo || ''}</td>
-                <td style="text-align:center; font-weight:600;">${r.integrantes || '—'}</td>
+                <td>${esc(r.carrera) || '—'}</td>
+                <td><strong>${esc(r.nombre)}</strong>${modificados.has(r.id) ? '<span class="badge-mod" title="Este registro fue modificado — ver historial en el detalle">✏️</span>' : ''}</td>
+                <td>${esc(r.boleta)}</td>
+                <td>${esc(r.materia)}</td>
+                <td>${esc(r.profesor)}</td>
+                <td>${esc(r.mesa_de_trabajo)}</td>
+                <td style="text-align:center; font-weight:600;">${esc(r.integrantes) || '—'}</td>
                 <td>
                     <select class="estado-select ${r.estado}" onchange="cambiarEstado('${r.id}', this.value, this)" onclick="event.stopPropagation()">
                         <option value="pendiente"  ${r.estado === 'pendiente'  ? 'selected' : ''}>⏳ Pendiente</option>
@@ -729,7 +766,7 @@
         ].map(([k,v]) => `
             <div class="detalle-fila">
                 <span class="detalle-key">${k}</span>
-                <span class="detalle-val">${v}</span>
+                <span class="detalle-val">${esc(v)}</span>
             </div>
         `).join('');
 
@@ -740,12 +777,79 @@
         ].map(([k,v]) => `
             <div class="detalle-fila">
                 <span class="detalle-key">${k}</span>
-                <span class="detalle-val">${v}</span>
+                <span class="detalle-val">${esc(v)}</span>
             </div>
         `).join('');
 
         document.getElementById('panel-detalle').classList.add('visible');
         document.getElementById('overlay').classList.add('visible');
+
+        cargarHistorial(id);
+    }
+
+    // ── Historial de cambios ───────────────────────────────────────────────────
+
+    const ETIQUETAS = {
+        fecha: 'Fecha', carrera: 'Carrera', nombre: 'Nombre', boleta: 'Boleta',
+        materia: 'Materia', profesor: 'Profesor', mesa_de_trabajo: 'Mesa',
+        integrantes: 'Integrantes', equipos: 'Equipos', puntas: 'Puntas',
+        herramienta: 'Herramientas', estado: 'Estado', created_at: 'Ventana de modificación'
+    };
+    const ESTADOS = { pendiente: 'Pendiente', parcial: 'Parcial', entregado: 'Entregado' };
+
+    function valorLegible(campo, v) {
+        if (v === null || v === undefined || v === '') return '(vacío)';
+        if (campo === 'estado') return ESTADOS[v] || v;
+        if (campo === 'created_at') return formatearHora(v);
+        return String(v).split('\n').filter(Boolean).join(', ');
+    }
+
+    function autorLegible(h) {
+        if (h.autor === 'alumno')  return 'Alumno';
+        if (h.autor === 'sistema') return 'Directo en Supabase';
+        return 'Administrador (' + h.autor + ')';
+    }
+
+    function describirCambios(h) {
+        if (h.accion === 'eliminado') {
+            const c = h.cambios || {};
+            return [['Registro eliminado', `${c.nombre?.antes || ''} (boleta ${c.boleta?.antes || '—'})`, '']];
+        }
+        return Object.entries(h.cambios || {})
+            .filter(([campo]) => campo !== 'id')
+            .map(([campo, c]) => campo === 'created_at'
+                ? ['Ventana de modificación', '', 'Tiempo del alumno extendido 3 h']
+                : [ETIQUETAS[campo] || campo, valorLegible(campo, c.antes), valorLegible(campo, c.despues)]);
+    }
+
+    async function cargarHistorial(id) {
+        const cont = document.getElementById('detalle-historial');
+        cont.innerHTML = '<div class="hist-vacio">Cargando…</div>';
+
+        const { data, error } = await db.from('historial_registros')
+            .select('*').eq('registro_id', id).order('fecha_cambio', { ascending: false });
+
+        if (!registroActivo || registroActivo.id !== id) return;   // se cerró o cambió de registro
+        if (error) { cont.innerHTML = `<div class="hist-vacio">No se pudo cargar: ${esc(error.message)}</div>`; return; }
+        if (!data.length) { cont.innerHTML = '<div class="hist-vacio">Sin modificaciones.</div>'; return; }
+
+        cont.innerHTML = data.map(h => {
+            const clase = h.accion === 'eliminado' ? 'eliminado' : (h.autor === 'alumno' ? 'alumno' : 'admin');
+            const fecha = new Date(h.fecha_cambio).toLocaleString('es-MX', {
+                timeZone: 'America/Mexico_City', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'
+            });
+            const cambios = describirCambios(h).map(([campo, antes, despues]) => `
+                <div class="hist-cambio">
+                    <span class="hist-campo">${esc(campo)}:</span>
+                    ${antes ? `<span class="hist-antes">${esc(antes)}</span> → ` : ''}
+                    <span class="hist-despues">${esc(despues)}</span>
+                </div>`).join('');
+            return `
+                <div class="hist-item ${clase}">
+                    <div class="hist-cabecera"><strong>${fecha}</strong> — ${esc(autorLegible(h))}</div>
+                    ${cambios}
+                </div>`;
+        }).join('');
     }
 
     function cerrarPanel() {
@@ -829,7 +933,7 @@
 
         const { isConfirmed } = await Swal.fire({
             title: '¿Eliminar registro?',
-            html: `Se eliminará el registro de <strong>${registroActivo.nombre}</strong>.<br>Esta acción no se puede deshacer.`,
+            html: `Se eliminará el registro de <strong>${esc(registroActivo.nombre)}</strong>.<br>Esta acción no se puede deshacer.`,
             icon: 'warning',
             showCancelButton: true,
             confirmButtonText: 'Sí, eliminar',
@@ -882,12 +986,15 @@
 
         if (!fechas) return;
 
-        const { data, error } = await db.from('registros')
+        // Se descarga en bloques de 1000 (límite de Supabase por consulta),
+        // para que el reporte de todo el semestre salga completo
+        const { data, error } = await traerTodo(() => db.from('registros')
             .select('*')
             .gte('fecha', fechas.inicio)
             .lte('fecha', fechas.fin)
             .order('fecha', { ascending: true })
-            .order('created_at', { ascending: true });
+            .order('created_at', { ascending: true })
+            .order('id', { ascending: true }));
 
         if (error) { Swal.fire('Error', error.message, 'error'); return; }
         if (!data || data.length === 0) {
@@ -920,6 +1027,38 @@
         const anchos = Object.keys(filas[0]).map(k => ({ wch: Math.max(k.length, 14) }));
         hoja['!cols'] = anchos;
 
+        // Segunda hoja: historial de cambios hechos en ese rango de fechas
+        const { data: hist, error: errHist } = await traerTodo(() => db.from('historial_registros')
+            .select('*')
+            .gte('fecha_cambio', `${fechas.inicio}T00:00:00-06:00`)
+            .lte('fecha_cambio', `${fechas.fin}T23:59:59.999-06:00`)
+            .order('fecha_cambio', { ascending: true })
+            .order('id', { ascending: true }));
+
+        if (!errHist) {
+            const filasHist = [];
+            const porId = new Map(data.map(r => [r.id, r]));
+            (hist || []).forEach(h => {
+                const fecha = new Date(h.fecha_cambio);
+                describirCambios(h).forEach(([campo, antes, despues]) => filasHist.push({
+                    'Fecha del cambio': fecha.toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' }),
+                    'Hora':             formatearHora(h.fecha_cambio),
+                    'ID registro':      h.registro_id,
+                    'Alumno':           porId.get(h.registro_id)?.nombre || h.cambios?.nombre?.antes || '',
+                    'Hecho por':        autorLegible(h),
+                    'Acción':           h.accion === 'eliminado' ? 'Eliminado' : 'Modificado',
+                    'Campo':            campo,
+                    'Antes':            antes,
+                    'Después':          despues
+                }));
+            });
+            const hojaHist = filasHist.length
+                ? XLSX.utils.json_to_sheet(filasHist)
+                : XLSX.utils.aoa_to_sheet([['Sin cambios registrados en este rango de fechas']]);
+            hojaHist['!cols'] = [14, 8, 12, 28, 30, 12, 24, 40, 40].map(w => ({ wch: w }));
+            XLSX.utils.book_append_sheet(libro, hojaHist, 'Historial de cambios');
+        }
+
         const nombreArchivo = `lab_bioing_${fechas.inicio}_${fechas.fin}.xlsx`;
         XLSX.writeFile(libro, nombreArchivo);
 
@@ -928,6 +1067,24 @@
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────────
+
+    // Evita que texto escrito por alumnos se interprete como HTML/código en el panel
+    function esc(v) {
+        if (v === null || v === undefined) return '';
+        return String(v).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+    }
+
+    // Descarga todos los resultados de una consulta, en bloques de 1000
+    async function traerTodo(crearConsulta) {
+        const BLOQUE = 1000;
+        let todo = [];
+        for (let desde = 0; ; desde += BLOQUE) {
+            const { data, error } = await crearConsulta().range(desde, desde + BLOQUE - 1);
+            if (error) return { data: null, error };
+            todo = todo.concat(data || []);
+            if (!data || data.length < BLOQUE) return { data: todo, error: null };
+        }
+    }
 
     function formatearHora(ts) {
         if (!ts) return '—';

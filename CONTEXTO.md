@@ -179,3 +179,16 @@ o borra el usuario y créalo de nuevo con otra contraseña.
   `modificar_mi_registro(id, boleta_original, datos)`, que solo funcionan con el registro de hoy
   y dentro de las 3 horas. No pueden leer la tabla completa ni borrar nada.
 - Administradores (con sesión y correo en `administradores`): acceso total.
+
+## Historial de cambios (historial.sql)
+
+- Tabla `historial_registros`: se llena sola con un trigger cada vez que un registro se
+  **modifica** o se **elimina** (por el alumno, el administrador o directo en Supabase).
+- Guarda: `registro_id`, `fecha_cambio`, `autor` ('alumno', correo del admin o 'sistema'),
+  `accion` ('modificado' | 'eliminado') y `cambios` (JSON con valor antes/después por campo).
+- Solo los administradores pueden leerla; nadie puede escribirla ni borrarla desde la página.
+- En el panel admin:
+  - ✏️ junto al nombre en la tabla = el registro fue modificado.
+  - Sección "Historial de cambios" en el panel lateral de detalle.
+  - Hoja "Historial de cambios" en el Excel exportado (cambios hechos en el rango de fechas).
+- La exportación a Excel descarga en bloques de 1000 para no cortar reportes grandes (semestre).

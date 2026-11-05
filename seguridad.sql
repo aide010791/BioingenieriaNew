@@ -47,7 +47,7 @@ drop policy if exists "admin_elimina"     on public.registros;
 -- Alumnos (sin sesión): SOLO pueden crear registros nuevos, siempre como 'pendiente'
 create policy "alumnos_insertan" on public.registros
     for insert to anon
-    with check (estado = 'pendiente');
+    with check (estado = 'pendiente' and id ~ '^[A-Z]{3}$');
 
 -- Administrador (con sesión iniciada): puede hacer todo
 create policy "admin_lee"       on public.registros for select to authenticated using (public.es_admin());
