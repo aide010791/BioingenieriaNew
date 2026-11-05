@@ -6,6 +6,8 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/png" sizes="48x48" href="css/favicon.png">
+    <link rel="apple-touch-icon" href="css/apple-touch-icon.png">
     <meta name="theme-color" content="#1e293b">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
@@ -420,6 +422,13 @@
             text-align: center;
         }
 
+        .logo-lab {
+            width: 150px;
+            height: 150px;
+            margin-bottom: 20px;
+            filter: drop-shadow(0 6px 16px rgba(15,23,42,0.15));
+        }
+
         .bienvenida-titulo {
             font-size: 22px;
             font-weight: 700;
@@ -495,6 +504,7 @@
 <!-- ── Pantalla de bienvenida ── -->
 <div id="pantalla-bienvenida" class="content">
     <div class="bienvenida">
+        <img src="css/logo-lab.webp" alt="Laboratorio de Bioingeniería UPIITA-IPN" class="logo-lab" width="150" height="150">
         <p class="bienvenida-titulo">¿Qué deseas hacer?</p>
         <p class="bienvenida-subtitulo">Selecciona una opción para continuar.</p>
         <div class="bienvenida-btns">
