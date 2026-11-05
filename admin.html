@@ -494,12 +494,13 @@
                     <th>Materia</th>
                     <th>Profesor</th>
                     <th>Mesa</th>
+                    <th>Integrantes</th>
                     <th>Estado</th>
                     <th>Acciones</th>
                 </tr>
             </thead>
             <tbody id="tabla-body">
-                <tr><td colspan="9"><div class="sin-registros">Selecciona una fecha para ver los registros.</div></td></tr>
+                <tr><td colspan="10"><div class="sin-registros">Selecciona una fecha para ver los registros.</div></td></tr>
             </tbody>
         </table>
     </div>
@@ -627,7 +628,7 @@
         const tbody = document.getElementById('tabla-body');
 
         if (!registros.length) {
-            tbody.innerHTML = '<tr><td colspan="9"><div class="sin-registros">No hay registros para esta fecha.</div></td></tr>';
+            tbody.innerHTML = '<tr><td colspan="10"><div class="sin-registros">No hay registros para esta fecha.</div></td></tr>';
             return;
         }
 
@@ -640,6 +641,7 @@
                 <td>${r.materia || ''}</td>
                 <td>${r.profesor || ''}</td>
                 <td>${r.mesa_de_trabajo || ''}</td>
+                <td style="text-align:center; font-weight:600;">${r.integrantes || '—'}</td>
                 <td>
                     <select class="estado-select ${r.estado}" onchange="cambiarEstado('${r.id}', this.value, this)" onclick="event.stopPropagation()">
                         <option value="pendiente"  ${r.estado === 'pendiente'  ? 'selected' : ''}>⏳ Pendiente</option>
@@ -695,8 +697,9 @@
             ['Boleta',   data.boleta],
             ['Materia',  data.materia],
             ['Profesor', data.profesor],
-            ['Mesa',     data.mesa_de_trabajo || '—'],
-            ['Hora',     formatearHora(data.created_at)],
+            ['Mesa',         data.mesa_de_trabajo || '—'],
+            ['Integrantes',  data.integrantes ? `${data.integrantes} persona(s)` : '—'],
+            ['Hora',         formatearHora(data.created_at)],
         ].map(([k,v]) => `
             <div class="detalle-fila">
                 <span class="detalle-key">${k}</span>
@@ -876,6 +879,7 @@
             'Materia':      r.materia      || '',
             'Profesor':     r.profesor     || '',
             'Mesa':         r.mesa_de_trabajo || '',
+            'Integrantes':  r.integrantes  || '',
             'Equipos':      r.equipos      || '',
             'Puntas':       r.puntas       || '',
             'Herramientas': r.herramienta  || '',
