@@ -528,7 +528,20 @@
 
         <div class="field">
             <label for="mesa_trabajo">Mesa de trabajo</label>
-            <input type="text" id="mesa_trabajo" name="mesa_trabajo" placeholder="Número de mesa" required>
+            <input type="number" id="mesa_trabajo" name="mesa_trabajo" placeholder="Número de mesa" min="1" required>
+        </div>
+
+        <div class="field">
+            <label for="integrantes">Número de integrantes</label>
+            <select id="integrantes" name="integrantes" required>
+                <option value="" disabled selected>¿Cuántos son en el equipo?</option>
+                <option value="1">1 — Individual</option>
+                <option value="2">2 integrantes</option>
+                <option value="3">3 integrantes</option>
+                <option value="4">4 integrantes</option>
+                <option value="5">5 integrantes</option>
+                <option value="6">6 integrantes</option>
+            </select>
         </div>
 
         <div class="nav-btns">
