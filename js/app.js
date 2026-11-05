@@ -283,16 +283,9 @@ document.getElementById('btn-modificar').addEventListener('click', async () => {
 
     if (!boleta) return;
 
-    const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' });
-
-    const { data, error } = await db
-        .from('registros')
-        .select('*')
-        .eq('boleta', boleta.trim())
-        .eq('fecha', hoy)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
+    // Búsqueda segura: el servidor solo devuelve el registro de HOY con esa boleta
+    const { data: filas, error } = await db.rpc('buscar_mi_registro', { p_boleta: boleta.trim() });
+    const data = filas && filas[0];
 
     if (error || !data) {
         Swal.fire('No encontrado', 'No hay un registro tuyo del día de hoy.', 'error');
@@ -319,6 +312,7 @@ document.getElementById('btn-modificar').addEventListener('click', async () => {
     document.getElementById('btn-registro').style.display = 'none';
     document.getElementById('btn-guardar').style.display = 'block';
     document.getElementById('formulario-registro').dataset.idModificando = data.id;
+    document.getElementById('formulario-registro').dataset.boletaOriginal = data.boleta;
 
     mostrarFormulario();
     irPaso(2);
@@ -334,25 +328,41 @@ async function guardarModificacion() {
 
     const { equipos, puntas, herramienta } = recopilarDatos();
 
-    const { error } = await db.from('registros').update({
-        fecha:          document.getElementById('fecha').value,
-        carrera:        document.getElementById('carrera').value,
-        nombre:         document.getElementById('nombre').value,
-        boleta:         document.getElementById('boleta').value,
-        materia:        document.getElementById('materia').value,
-        profesor:       document.getElementById('profesor').value,
-        mesa_de_trabajo: document.getElementById('mesa_trabajo').value,
-        integrantes:    parseInt(document.getElementById('integrantes').value) || 1,
-        equipos, puntas, herramienta
-    }).eq('id', id);
+    const form = document.getElementById('formulario-registro');
+
+    // Modificación segura: el servidor verifica boleta y ventana de 3 horas
+    const { data: ok, error } = await db.rpc('modificar_mi_registro', {
+        p_id: id,
+        p_boleta_original: form.dataset.boletaOriginal || '',
+        p_datos: {
+            fecha:           document.getElementById('fecha').value,
+            carrera:         document.getElementById('carrera').value,
+            nombre:          document.getElementById('nombre').value,
+            boleta:          document.getElementById('boleta').value,
+            materia:         document.getElementById('materia').value,
+            profesor:        document.getElementById('profesor').value,
+            mesa_de_trabajo: document.getElementById('mesa_trabajo').value,
+            integrantes:     parseInt(document.getElementById('integrantes').value) || 1,
+            equipos, puntas, herramienta
+        }
+    });
 
     if (error) { Swal.fire('Error', error.message, 'error'); return; }
+    if (!ok) {
+        Swal.fire({
+            title: 'No se pudo modificar',
+            text: 'El período de 3 horas ya pasó. Contacta al encargado del laboratorio.',
+            icon: 'warning', confirmButtonColor: '#2563eb'
+        });
+        return;
+    }
 
     Swal.fire({ title: '¡Actualizado!', icon: 'success', confirmButtonColor: '#2563eb' });
 
     document.getElementById('btn-registro').style.display = 'block';
     document.getElementById('btn-guardar').style.display = 'none';
-    delete document.getElementById('formulario-registro').dataset.idModificando;
+    delete form.dataset.idModificando;
+    delete form.dataset.boletaOriginal;
 
     limpiarFormulario();
     irPaso(1);
