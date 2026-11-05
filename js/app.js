@@ -42,7 +42,7 @@ function irPaso(num) {
 }
 
 function validarPaso1() {
-    const campos = ['fecha','carrera','nombre','boleta','materia','profesor','mesa_trabajo'];
+    const campos = ['fecha','carrera','nombre','boleta','materia','profesor','mesa_trabajo','integrantes'];
     for (const id of campos) {
         const el = document.getElementById(id);
         if (!el.value.trim()) {
@@ -62,13 +62,14 @@ function validarPaso1() {
 function generarResumen() {
     // Datos personales
     const datos = {
-        'Fecha':    document.getElementById('fecha').value,
-        'Carrera':  document.getElementById('carrera').value,
-        'Nombre':   document.getElementById('nombre').value,
-        'Boleta':   document.getElementById('boleta').value,
-        'Materia':  document.getElementById('materia').value,
-        'Profesor': document.getElementById('profesor').value,
-        'Mesa':     document.getElementById('mesa_trabajo').value,
+        'Fecha':         document.getElementById('fecha').value,
+        'Carrera':       document.getElementById('carrera').value,
+        'Nombre':        document.getElementById('nombre').value,
+        'Boleta':        document.getElementById('boleta').value,
+        'Materia':       document.getElementById('materia').value,
+        'Profesor':      document.getElementById('profesor').value,
+        'Mesa':          document.getElementById('mesa_trabajo').value,
+        'Integrantes':   document.getElementById('integrantes').value,
     };
 
     document.getElementById('resumen-datos').innerHTML =
@@ -141,15 +142,21 @@ document.getElementById('formulario-registro').addEventListener('submit', async 
     const id = generarIdUnico();
     const { equipos, puntas, herramienta } = recopilarDatos();
 
+    // Capturar datos para el resumen ANTES de limpiar el formulario
+    const nombre      = document.getElementById('nombre').value;
+    const mesa        = document.getElementById('mesa_trabajo').value;
+    const integrantes = document.getElementById('integrantes').value;
+
     const { error } = await db.from('registros').insert([{
         id,
-        fecha:          document.getElementById('fecha').value,
-        carrera:        document.getElementById('carrera').value,
-        nombre:         document.getElementById('nombre').value,
-        boleta:         document.getElementById('boleta').value,
-        materia:        document.getElementById('materia').value,
-        profesor:       document.getElementById('profesor').value,
-        mesa_de_trabajo: document.getElementById('mesa_trabajo').value,
+        fecha:           document.getElementById('fecha').value,
+        carrera:         document.getElementById('carrera').value,
+        nombre,
+        boleta:          document.getElementById('boleta').value,
+        materia:         document.getElementById('materia').value,
+        profesor:        document.getElementById('profesor').value,
+        mesa_de_trabajo: mesa,
+        integrantes:     parseInt(integrantes) || 1,
         equipos,
         puntas,
         herramienta,
@@ -164,27 +171,62 @@ document.getElementById('formulario-registro').addEventListener('submit', async 
         return;
     }
 
+    // Limpiar y volver a bienvenida antes de mostrar el popup
+    limpiarFormulario();
+    irPaso(1);
+    volverBienvenida();
+
+    // Construir lista de material registrado
+    const todosMateriales = [
+        ...(equipos     ? equipos.split('\n')     : []),
+        ...(puntas      ? puntas.split('\n')      : []),
+        ...(herramienta ? herramienta.split('\n') : [])
+    ].filter(Boolean);
+
+    const materialHtml = todosMateriales.length
+        ? todosMateriales.map(m => `<li style="margin-bottom:4px">${m}</li>`).join('')
+        : '<li style="color:#94a3b8">— Sin material seleccionado —</li>';
+
     if (sinInternet) {
         Swal.fire({
-            title: '¡Registro guardado!',
-            text: 'No hay conexión ahora, pero tu registro se enviará automáticamente cuando recuperes internet.',
+            title: '¡Guardado sin conexión!',
+            html: `<p style="color:#64748b; font-size:14px; font-family:Inter,sans-serif;">Sin internet ahora, pero tu registro se enviará automáticamente cuando te reconectes.</p>`,
             icon: 'info',
-            confirmButtonText: 'OK',
+            confirmButtonText: 'Listo',
             confirmButtonColor: '#2563eb'
         });
     } else {
         Swal.fire({
-            title: '¡Registro exitoso!',
-            text: 'Tu información fue guardada correctamente.',
+            title: '¡Registro exitoso! ✓',
+            html: `
+                <div style="text-align:left; font-family:Inter,sans-serif; font-size:14px;">
+                    <div style="background:#f8fafc; border-radius:10px; padding:14px 16px; margin-bottom:10px;">
+                        <div style="color:#64748b; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:10px;">Datos registrados</div>
+                        <div style="display:flex; justify-content:space-between; padding:5px 0; border-bottom:1px solid #f1f5f9;">
+                            <span style="color:#64748b; font-weight:500;">Alumno</span>
+                            <span style="color:#1e293b; font-weight:600;">${nombre}</span>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; padding:5px 0; border-bottom:1px solid #f1f5f9;">
+                            <span style="color:#64748b; font-weight:500;">Mesa</span>
+                            <span style="color:#1e293b; font-weight:600;">${mesa}</span>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; padding:5px 0;">
+                            <span style="color:#64748b; font-weight:500;">Integrantes</span>
+                            <span style="color:#1e293b; font-weight:600;">${integrantes}</span>
+                        </div>
+                    </div>
+                    <div style="background:#f8fafc; border-radius:10px; padding:14px 16px;">
+                        <div style="color:#64748b; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:10px;">Material solicitado</div>
+                        <ul style="margin:0; padding-left:18px; color:#334155; font-size:13px; line-height:1.7;">
+                            ${materialHtml}
+                        </ul>
+                    </div>
+                </div>`,
             icon: 'success',
-            confirmButtonText: 'OK',
+            confirmButtonText: 'Listo',
             confirmButtonColor: '#2563eb'
         });
     }
-
-    limpiarFormulario();
-    irPaso(1);
-    volverBienvenida();
 });
 
 // ── Generar ID único ──────────────────────────────────────────────────────────
@@ -216,8 +258,12 @@ function limpiarFormulario() {
     document.querySelectorAll('#formulario-registro input[type="text"], #formulario-registro input[type="number"], #formulario-registro input[type="date"]').forEach(i => i.value = '');
     document.querySelectorAll('#formulario-registro select').forEach(s => s.selectedIndex = 0);
     document.querySelectorAll('#formulario-registro input[type="checkbox"]').forEach(cb => cb.checked = false);
-    document.querySelectorAll('#formulario-registro input[type="number"]').forEach(i => i.style.display = 'none');
+    document.querySelectorAll('.check-item input[type="number"]').forEach(i => i.style.display = 'none');
     document.getElementById('lista-herramientas').innerHTML = '';
+
+    // Restaurar fecha de hoy
+    const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' });
+    document.getElementById('fecha').value = hoy;
 }
 
 // ── Modificar registro del día ────────────────────────────────────────────────
@@ -296,6 +342,7 @@ async function guardarModificacion() {
         materia:        document.getElementById('materia').value,
         profesor:       document.getElementById('profesor').value,
         mesa_de_trabajo: document.getElementById('mesa_trabajo').value,
+        integrantes:    parseInt(document.getElementById('integrantes').value) || 1,
         equipos, puntas, herramienta
     }).eq('id', id);
 
@@ -314,13 +361,14 @@ async function guardarModificacion() {
 // ── Llenar formulario con datos existentes ────────────────────────────────────
 
 function llenarFormularioConDatos(datos) {
-    document.getElementById('fecha').value       = datos.fecha || '';
-    document.getElementById('carrera').value     = datos.carrera || '';
-    document.getElementById('nombre').value      = datos.nombre || '';
-    document.getElementById('boleta').value      = datos.boleta || '';
-    document.getElementById('materia').value     = datos.materia || '';
-    document.getElementById('profesor').value    = datos.profesor || '';
+    document.getElementById('fecha').value        = datos.fecha || '';
+    document.getElementById('carrera').value      = datos.carrera || '';
+    document.getElementById('nombre').value       = datos.nombre || '';
+    document.getElementById('boleta').value       = datos.boleta || '';
+    document.getElementById('materia').value      = datos.materia || '';
+    document.getElementById('profesor').value     = datos.profesor || '';
     document.getElementById('mesa_trabajo').value = datos.mesa_de_trabajo || '';
+    document.getElementById('integrantes').value  = datos.integrantes || '';
 
     // Equipos
     const equipos = datos.equipos ? datos.equipos.split('\n') : [];
@@ -370,6 +418,10 @@ function agregarHerramientaTag(texto) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    // Auto-llenar fecha de hoy (zona horaria México)
+    const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' });
+    document.getElementById('fecha').value = hoy;
+
     const input = document.getElementById('herramienta-input');
     const boton = document.getElementById('agregar-herramienta');
 
