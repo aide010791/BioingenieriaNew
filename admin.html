@@ -172,6 +172,11 @@
         .imp-chip { background: #eff6ff; color: #1e40af; border-radius: 999px; padding: 4px 12px; font-weight: 600; }
         #tabla-impresiones tbody tr { cursor: default; }
         .btn-borrar-imp { background: #fee2e2; color: #991b1b; border: none; border-radius: 6px; padding: 6px 10px; cursor: pointer; font-size: 13px; }
+        .btn-tandas { display: block; margin-top: 4px; background: #e0f2fe; color: #0c4a6e; border: none; border-radius: 999px; padding: 2px 10px; font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 600; cursor: pointer; }
+        .btn-tandas:hover { background: #bae6fd; }
+        #tabla-impresiones tr.fila-tanda td { background: #f8fafc; font-size: 13px; color: #475569; padding-top: 7px; padding-bottom: 7px; }
+        #tabla-impresiones tr.fila-tanda td:first-child { padding-left: 36px; font-weight: 600; color: #0c4a6e; }
+        .btn-borrar-tanda { padding: 4px 8px; font-size: 12px; }
 
         /* ── Tabla ── */
         .tabla-wrap {
@@ -1354,15 +1359,52 @@
         renderImpresiones();
     }
 
+    // Agrupa las tandas de un mismo envío (columna "grupo"); los registros viejos son de una tanda
+    function agruparImpresiones(filas) {
+        const grupos = [], porClave = {};
+        filas.forEach(r => {
+            const clave = r.grupo || ('id:' + r.id);
+            let g = porClave[clave];
+            if (!g) {
+                g = porClave[clave] = { clave, grupo: r.grupo || null, filas: [], piezas: 0, min: 0, gramos: 0, porTipo: {} };
+                grupos.push(g);
+            }
+            g.filas.push(r);
+            g.piezas += r.piezas || 0;
+            g.min    += r.tiempo_min || 0;
+            g.gramos += Number(r.gramos || 0);
+            g.porTipo[r.filamento] = (g.porTipo[r.filamento] || 0) + Number(r.gramos || 0);
+        });
+        grupos.forEach(g => {
+            g.filas.sort((a, b) => (a.tanda || 1) - (b.tanda || 1) || a.id - b.id);
+            Object.assign(g, (({ fecha, nombre, boleta, carrera, materia, profesor, created_at }) =>
+                ({ fecha, nombre, boleta, carrera, materia, profesor, created_at }))(g.filas[0]));
+        });
+        return grupos;
+    }
+
+    function textoFilamentos(porTipo, conGramos) {
+        return Object.entries(porTipo).sort((a, b) => b[1] - a[1])
+            .map(([t, g]) => conGramos ? `${t} ${Math.round(g * 10) / 10} g` : t).join(' · ');
+    }
+
+    const tandasAbiertas = new Set();
+
+    function alternarTandas(clave) {
+        tandasAbiertas.has(clave) ? tandasAbiertas.delete(clave) : tandasAbiertas.add(clave);
+        renderImpresiones();
+    }
+
     function renderImpresiones() {
         const data = impresionesActuales;
+        const grupos = agruparImpresiones(data);
         const tot = data.reduce((a, r) => ({
             piezas: a.piezas + (r.piezas || 0),
             min:    a.min + (r.tiempo_min || 0),
             gramos: a.gramos + Number(r.gramos || 0)
         }), { piezas: 0, min: 0, gramos: 0 });
 
-        document.getElementById('imp-registros').textContent = data.length;
+        document.getElementById('imp-registros').textContent = grupos.length;
         document.getElementById('imp-piezas').textContent = tot.piezas;
         document.getElementById('imp-horas').textContent = (tot.min / 60).toFixed(1);
         document.getElementById('imp-gramos').textContent = Math.round(tot.gramos).toLocaleString('es-MX');
@@ -1378,37 +1420,74 @@
             body.innerHTML = '<tr><td colspan="11"><div class="sin-registros">No hay impresiones registradas en ese periodo.</div></td></tr>';
             return;
         }
-        body.innerHTML = data.map(r => `
-            <tr>
-                <td>${esc(r.fecha)}</td>
-                <td><strong>${esc(r.nombre)}</strong></td>
-                <td>${esc(r.boleta)}</td>
-                <td>${esc(r.carrera) || '—'}</td>
-                <td>${esc(r.materia)}</td>
-                <td>${esc(r.profesor)}</td>
-                <td style="text-align:center; font-weight:600;">${esc(r.piezas)}</td>
+        body.innerHTML = grupos.map(g => {
+            const n = g.filas.length, abierto = tandasAbiertas.has(g.clave);
+            const clave = esc(JSON.stringify(g.clave));
+            const boton = n > 1
+                ? `<button class="btn-tandas" onclick="alternarTandas(${clave})" aria-expanded="${abierto}">${abierto ? '▾' : '▸'} ${n} tandas</button>` : '';
+            let html = `
+            <tr class="${n > 1 ? 'fila-grupo' : ''}">
+                <td>${esc(g.fecha)}</td>
+                <td><strong>${esc(g.nombre)}</strong>${boton}</td>
+                <td>${esc(g.boleta)}</td>
+                <td>${esc(g.carrera) || '—'}</td>
+                <td>${esc(g.materia)}</td>
+                <td>${esc(g.profesor)}</td>
+                <td style="text-align:center; font-weight:600;">${g.piezas}</td>
+                <td>${formatearTiempo(g.min)}</td>
+                <td>${esc(textoFilamentos(g.porTipo, false))}</td>
+                <td style="text-align:right; font-weight:600;">${Math.round(g.gramos * 10) / 10} g</td>
+                <td><button class="btn-borrar-imp" title="${n > 1 ? 'Eliminar el registro completo' : 'Eliminar registro'}" onclick="eliminarRegistroImp(${clave})">🗑</button></td>
+            </tr>`;
+            if (n > 1 && abierto) html += g.filas.map((r, i) => `
+            <tr class="fila-tanda">
+                <td colspan="6">Tanda ${i + 1} de ${n}</td>
+                <td style="text-align:center;">${esc(r.piezas)}</td>
                 <td>${formatearTiempo(r.tiempo_min)}</td>
                 <td>${esc(r.filamento)}</td>
-                <td style="text-align:right; font-weight:600;">${esc(r.gramos)} g</td>
-                <td><button class="btn-borrar-imp" title="Eliminar registro" onclick="eliminarImpresion(${Number(r.id)})">🗑</button></td>
+                <td style="text-align:right;">${esc(r.gramos)} g</td>
+                <td><button class="btn-borrar-imp btn-borrar-tanda" title="Eliminar solo esta tanda" onclick="eliminarTanda(${Number(r.id)})">🗑</button></td>
             </tr>`).join('');
+            return html;
+        }).join('');
     }
 
-    async function eliminarImpresion(id) {
+    async function eliminarRegistroImp(clave) {
+        const g = agruparImpresiones(impresionesActuales).find(x => x.clave === clave);
+        if (!g) return;
+        const n = g.filas.length;
+        const { isConfirmed } = await Swal.fire({
+            title: '¿Eliminar registro?',
+            html: `Impresión de <strong>${esc(g.nombre)}</strong> del ${esc(g.fecha)}` +
+                  (n > 1 ? `, con sus <strong>${n} tandas</strong>` : '') + `.<br>Esta acción no se puede deshacer.`,
+            icon: 'warning', showCancelButton: true,
+            confirmButtonText: 'Sí, eliminar', cancelButtonText: 'Cancelar', confirmButtonColor: '#dc2626'
+        });
+        if (!isConfirmed) return;
+        const ids = g.filas.map(r => r.id);
+        const { error } = await db.from('impresiones').delete().in('id', ids);
+        if (error) { Swal.fire('Error', error.message, 'error'); return; }
+        impresionesActuales = impresionesActuales.filter(x => !ids.includes(x.id));
+        tandasAbiertas.delete(clave);
+        renderImpresiones();
+        Swal.fire({ toast: true, position: 'top', icon: 'success', title: 'Registro eliminado', showConfirmButton: false, timer: 1800 });
+    }
+
+    async function eliminarTanda(id) {
         const r = impresionesActuales.find(x => x.id === id);
         if (!r) return;
         const { isConfirmed } = await Swal.fire({
-            title: '¿Eliminar registro?',
-            html: `Impresión de <strong>${esc(r.nombre)}</strong> del ${esc(r.fecha)}.<br>Esta acción no se puede deshacer.`,
+            title: '¿Eliminar esta tanda?',
+            html: `Tanda de <strong>${esc(r.nombre)}</strong>: ${esc(r.piezas)} pieza(s), ${formatearTiempo(r.tiempo_min)}, ${esc(r.gramos)} g de ${esc(r.filamento)}.<br>Las demás tandas del registro se conservan.`,
             icon: 'warning', showCancelButton: true,
-            confirmButtonText: 'Sí, eliminar', cancelButtonText: 'Cancelar', confirmButtonColor: '#dc2626'
+            confirmButtonText: 'Sí, eliminar tanda', cancelButtonText: 'Cancelar', confirmButtonColor: '#dc2626'
         });
         if (!isConfirmed) return;
         const { error } = await db.from('impresiones').delete().eq('id', id);
         if (error) { Swal.fire('Error', error.message, 'error'); return; }
         impresionesActuales = impresionesActuales.filter(x => x.id !== id);
         renderImpresiones();
-        Swal.fire({ toast: true, position: 'top', icon: 'success', title: 'Registro eliminado', showConfirmButton: false, timer: 1800 });
+        Swal.fire({ toast: true, position: 'top', icon: 'success', title: 'Tanda eliminada', showConfirmButton: false, timer: 1800 });
     }
 
     function exportarImpresiones() {
@@ -1416,7 +1495,15 @@
         const fin    = document.getElementById('imp-fin').value;
         if (!impresionesActuales.length) { Swal.fire('Sin datos', 'Primero busca un periodo con registros.', 'info'); return; }
 
-        const filas = [...impresionesActuales].reverse().map(r => ({
+        // Registros en orden cronológico, numerados 1, 2, 3…
+        const grupos = agruparImpresiones(impresionesActuales).reverse();
+        const horas = min => Math.round(min / 6) / 10;
+        const libro = XLSX.utils.book_new();
+
+        const detalle = [];
+        grupos.forEach((g, gi) => g.filas.forEach((r, i) => detalle.push({
+            'Registro':        gi + 1,
+            'Tanda':           `${i + 1} de ${g.filas.length}`,
             'Fecha':           r.fecha,
             'Hora de registro': formatearHora(r.created_at),
             'Nombre':          r.nombre,
@@ -1426,43 +1513,61 @@
             'Profesor':        r.profesor,
             'Piezas':          r.piezas,
             'Tiempo (min)':    r.tiempo_min,
-            'Tiempo (horas)':  Math.round(r.tiempo_min / 6) / 10,
+            'Tiempo (horas)':  horas(r.tiempo_min),
             'Filamento':       r.filamento,
             'Gramos':          Number(r.gramos)
-        }));
-        const libro = XLSX.utils.book_new();
-        const hoja = XLSX.utils.json_to_sheet(filas);
-        hoja['!cols'] = [12, 14, 28, 14, 14, 30, 28, 8, 12, 14, 11, 10].map(w => ({ wch: w }));
+        })));
+        const hoja = XLSX.utils.json_to_sheet(detalle);
+        hoja['!cols'] = [9, 8, 12, 14, 28, 14, 14, 30, 28, 8, 12, 14, 11, 10].map(w => ({ wch: w }));
         XLSX.utils.book_append_sheet(libro, hoja, 'Impresiones');
+
+        const hojaReg = XLSX.utils.json_to_sheet(grupos.map((g, gi) => ({
+            'Registro':        gi + 1,
+            'Fecha':           g.fecha,
+            'Hora de registro': formatearHora(g.created_at),
+            'Nombre':          g.nombre,
+            'Boleta':          g.boleta,
+            'Carrera':         g.carrera || '',
+            'Materia':         g.materia,
+            'Profesor':        g.profesor,
+            'Tandas':          g.filas.length,
+            'Piezas':          g.piezas,
+            'Tiempo (min)':    g.min,
+            'Tiempo (horas)':  horas(g.min),
+            'Filamentos':      textoFilamentos(g.porTipo, true),
+            'Gramos':          Math.round(g.gramos * 10) / 10
+        })));
+        hojaReg['!cols'] = [9, 12, 14, 28, 14, 14, 30, 28, 8, 8, 12, 14, 24, 10].map(w => ({ wch: w }));
+        XLSX.utils.book_append_sheet(libro, hojaReg, 'Registros');
 
         const porTipo = {};
         impresionesActuales.forEach(r => {
-            const t = porTipo[r.filamento] || (porTipo[r.filamento] = { registros: 0, piezas: 0, min: 0, gramos: 0 });
-            t.registros++; t.piezas += r.piezas; t.min += r.tiempo_min; t.gramos += Number(r.gramos);
+            const t = porTipo[r.filamento] || (porTipo[r.filamento] = { tandas: 0, piezas: 0, min: 0, gramos: 0 });
+            t.tandas++; t.piezas += r.piezas; t.min += r.tiempo_min; t.gramos += Number(r.gramos);
         });
         const resumen = Object.entries(porTipo).map(([t, v]) => ({
-            'Filamento': t, 'Registros': v.registros, 'Piezas': v.piezas,
-            'Horas': Math.round(v.min / 6) / 10, 'Gramos': Math.round(v.gramos * 10) / 10
+            'Filamento': t, 'Tandas': v.tandas, 'Piezas': v.piezas,
+            'Horas': horas(v.min), 'Gramos': Math.round(v.gramos * 10) / 10
         }));
-        const tt = Object.values(porTipo).reduce((a, v) => ({ registros: a.registros + v.registros, piezas: a.piezas + v.piezas, min: a.min + v.min, gramos: a.gramos + v.gramos }),
-            { registros: 0, piezas: 0, min: 0, gramos: 0 });
-        const total = { 'Filamento': 'TOTAL', 'Registros': tt.registros, 'Piezas': tt.piezas,
-            'Horas': Math.round(tt.min / 6) / 10, 'Gramos': Math.round(tt.gramos * 10) / 10 };
+        const tt = Object.values(porTipo).reduce((a, v) => ({ tandas: a.tandas + v.tandas, piezas: a.piezas + v.piezas, min: a.min + v.min, gramos: a.gramos + v.gramos }),
+            { tandas: 0, piezas: 0, min: 0, gramos: 0 });
+        const total = { 'Filamento': 'TOTAL', 'Tandas': tt.tandas, 'Piezas': tt.piezas,
+            'Horas': horas(tt.min), 'Gramos': Math.round(tt.gramos * 10) / 10 };
         const hojaRes = XLSX.utils.json_to_sheet([...resumen, total]);
         hojaRes['!cols'] = [14, 10, 10, 10, 12].map(w => ({ wch: w }));
         XLSX.utils.book_append_sheet(libro, hojaRes, 'Resumen');
 
         const porCarrera = {};
-        impresionesActuales.forEach(r => {
-            const k = r.carrera || 'Sin carrera';
-            const c = porCarrera[k] || (porCarrera[k] = { registros: 0, piezas: 0, min: 0, gramos: 0 });
-            c.registros++; c.piezas += r.piezas; c.min += r.tiempo_min; c.gramos += Number(r.gramos);
+        grupos.forEach(g => {
+            const k = g.carrera || 'Sin carrera';
+            const c = porCarrera[k] || (porCarrera[k] = { registros: 0, tandas: 0, piezas: 0, min: 0, gramos: 0 });
+            c.registros++; c.tandas += g.filas.length; c.piezas += g.piezas; c.min += g.min; c.gramos += g.gramos;
         });
         const hojaCar = XLSX.utils.json_to_sheet(Object.entries(porCarrera)
             .sort((a, b) => b[1].gramos - a[1].gramos)
-            .map(([k, v]) => ({ 'Carrera': k, 'Registros': v.registros, 'Piezas': v.piezas,
-                'Horas': Math.round(v.min / 6) / 10, 'Gramos': Math.round(v.gramos * 10) / 10 })));
-        hojaCar['!cols'] = [16, 10, 10, 10, 12].map(w => ({ wch: w }));
+            .map(([k, v]) => ({ 'Carrera': k, 'Registros': v.registros, 'Tandas': v.tandas, 'Piezas': v.piezas,
+                'Horas': horas(v.min), 'Gramos': Math.round(v.gramos * 10) / 10 })));
+        hojaCar['!cols'] = [16, 10, 10, 10, 10, 12].map(w => ({ wch: w }));
         XLSX.utils.book_append_sheet(libro, hojaCar, 'Por carrera');
 
         XLSX.writeFile(libro, `impresion3d_${inicio}_${fin}.xlsx`);
